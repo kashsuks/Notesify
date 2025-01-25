@@ -12,7 +12,6 @@ import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
-import { solveMathEquation } from "@/app/api/math/route"; // Import the math solver utility
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -198,7 +197,30 @@ export default function Component() {
         }
     };
 
-    // Call the math-solving API
+    // Function to call the Groq API
+    const solveWithGroq = async (latex: any) => {
+        try {
+            const response = await fetch('/api/math', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ latex }),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            return data.response; // Return the step-by-step solution
+        } catch (error) {
+            console.error("Error calling Groq API:", error);
+            throw error;
+        }
+    };
+
+    // Function to solve the selected equation
     const solveSelectedEquation = async () => {
         if (selectedText.trim() === "") {
             setError("No equation selected.");
@@ -209,8 +231,10 @@ export default function Component() {
         setError("");
 
         try {
-            const solution = await solveMathEquation(selectedText);
-            setMathSolution(solution);
+            // Call the Groq API to solve the LaTeX equation
+            const solution = await solveWithGroq(selectedText);
+            setMathSolution(solution); // Set the step-by-step solution
+            console.log("Step-by-step solution:", solution);
         } catch (error) {
             console.error("Error solving equation:", error);
             setError("Failed to solve the equation.");
