@@ -554,18 +554,30 @@ export default function Component() {
         setEditMode(false);
     };
 
-    const handleTextSelection = useCallback(() => {
+    /*/const handleTextSelection = useCallback(() => {
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) {
+          setSelectedText(selection.toString());
         }
-    }, []);
-
+      }, []); /*/
+    
+      
+    const saveSelectedText = () => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          const selected = selection.toString();
+          setSelectedText(selected);
+          console.log("Selected Text:", selected);
+        }
+    };
+      
+    /*/
     useEffect(() => {
         document.addEventListener("mouseup", handleTextSelection);
         return () => {
             document.removeEventListener("mouseup", handleTextSelection);
         };
-    }, [handleTextSelection]);
+    }, [handleTextSelection]); /*/
 
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
@@ -617,6 +629,16 @@ export default function Component() {
                             >
                                 {isMathMode ? "Exit Math Mode" : "Enter Math Mode"}
                             </Button>
+                            <Button
+                                onClick={saveSelectedText}
+                                className="bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
+                            >
+                                Save Selected Text
+                            </Button>
+                            <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
+                                <strong>Selected Text:</strong>
+                                <p>{selectedText}</p>
+                            </div>
                         </div>
                     </div>
                 </header>
