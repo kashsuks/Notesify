@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { solveMathEquation } from "@/app/api/math/route"; // Import the math solver utility
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -99,7 +100,6 @@ interface Note {
 }
 
 const protectLaTeX = (content: string) => {
-    // Replace LaTeX blocks with placeholders
     const latexBlocks: string[] = [];
     const protectedContent = content.replace(/\$\$.*?\$\$|\$.*?\$/g, (match) => {
         latexBlocks.push(match);
@@ -109,9 +109,21 @@ const protectLaTeX = (content: string) => {
 };
 
 const restoreLaTeX = (content: string, latexBlocks: string[]) => {
-    // Restore LaTeX blocks from placeholders
     return content.replace(/@@LaTeX(\d+)@@/g, (_, index) => latexBlocks[Number(index)]);
 };
+
+const NoteEditor = React.memo(({ content, onChange }: { content: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void }) => {
+    return (
+        <Textarea
+            value={content}
+            onChange={onChange}
+            placeholder="Edit your note here..."
+            className="w-full h-full text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white"
+            aria-label="Edit Note"
+            autoFocus
+        />
+    );
+});
 
 export default function Component() {
     const [notes, setNotes] = useState<Note[]>([
@@ -135,6 +147,8 @@ export default function Component() {
     const [isExporting, setIsExporting] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedText, setSelectedText] = useState("");
+    const [mathSolution, setMathSolution] = useState("");
+    const [isSolving, setIsSolving] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -147,10 +161,10 @@ export default function Component() {
 
     const selectedTextRef = useRef("");
 
-    const [isMathMode, setIsMathMode] = useState(false); // Added for math mode
-    const [mathInput, setMathInput] = useState(""); // Added for LaTeX input
-    const [mathError, setMathError] = useState(""); // Added for LaTeX errors
-    const mathInputRef = useRef<HTMLTextAreaElement>(null); // Added for auto-focus
+    const [isMathMode, setIsMathMode] = useState(false);
+    const [mathInput, setMathInput] = useState("");
+    const [mathError, setMathError] = useState("");
+    const mathInputRef = useRef<HTMLTextAreaElement>(null);
 
     // Handle keyboard shortcut for math mode
     useEffect(() => {
@@ -174,122 +188,63 @@ export default function Component() {
         }
     }, [isMathMode]);
 
-    const removeDuplicates = (content: string) => {
-        const lines = content.split("\n");
-        const uniqueLines = [...new Set(lines)];
-        return uniqueLines.join("\n");
-    };
-
-    // Insert LaTeX equation into notes
-    const insertMathEquation = () => {
-        if (mathInput.trim()) {
-            const equation = `$${mathInput}$`;
-            setNotes((prevNotes) => {
-                const newNotes = [...prevNotes];
-                const currentNote = newNotes[currentPage];
-                const newContent = removeDuplicates(currentNote.content + `\n${equation}\n`);
-                newNotes[currentPage] = {
-                    ...currentNote,
-                    content: newContent,
-                };
-                return newNotes;
-            });
-            setMathInput("");
-            setIsMathMode(false);
+    // Save selected text to state
+    const saveSelectedText = () => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+            const selected = selection.toString();
+            setSelectedText(selected);
+            console.log("Selected Text:", selected);
         }
     };
 
-    // Render LaTeX in Markdown
-    const renderLaTeX = (text: string) => {
-        try {
-            const inlineRegex = /\$(.*?)\$/g; // Inline math: $...$
-            const blockRegex = /\$\$(.*?)\$\$/g; // Block math: $$...$$
-            return text
-                .split(blockRegex)
-                .map((part, index) => {
-                    if (index % 2 === 1) {
-                        return (
-                            <div
-                                key={index}
-                                dangerouslySetInnerHTML={{
-                                    __html: katex.renderToString(part, {
-                                        throwOnError: false,
-                                        displayMode: true, // Render as block math
-                                    }),
-                                }}
-                            />
-                        );
-                    }
-                    return part
-                        .split(inlineRegex)
-                        .map((subPart, subIndex) => {
-                            if (subIndex % 2 === 1) {
-                                return (
-                                    <span
-                                        key={`${index}-${subIndex}`}
-                                        dangerouslySetInnerHTML={{
-                                            __html: katex.renderToString(subPart, {
-                                                throwOnError: false,
-                                            }),
-                                        }}
-                                    />
-                                );
-                            }
-                            return subPart;
-                        });
-                });
-        } catch (error) {
-            setMathError("Invalid LaTeX input");
-            return text;
+    // Call the math-solving API
+    const solveSelectedEquation = async () => {
+        if (selectedText.trim() === "") {
+            setError("No equation selected.");
+            return;
         }
-    };
 
-    // Render Markdown with LaTeX support
-    const renderMarkdown = (content: string) => {
-        return (
-            <ReactMarkdown
-                components={{
-                    p: ({ node, ...props }) => {
-                        const children = React.Children.toArray(props.children);
-                        return (
-                            <p {...props}>
-                                {children.map((child, index) =>
-                                    typeof child === "string"
-                                        ? renderLaTeX(child)
-                                        : child
-                                )}
-                            </p>
-                        );
-                    },
-                }}
-            >
-                {content}
-            </ReactMarkdown>
-        );
-    };
+        setIsSolving(true);
+        setError("");
 
-    const exportNotes = async () => {
-        setIsExporting(true);
         try {
-          const response = await fetch("http://localhost:8000/upload", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(notes),
-          });
-      
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-      
-          // console.log("Notes exported successfully");
+            const solution = await solveMathEquation(selectedText);
+            setMathSolution(solution);
         } catch (error) {
-          console.error("Error exporting notes:", error);
+            console.error("Error solving equation:", error);
+            setError("Failed to solve the equation.");
         } finally {
-          setIsExporting(false);
+            setIsSolving(false);
         }
-      };
+    };
+
+    // Handle manual input with debouncing
+    const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newContent = e.target.value;
+        setPendingContent(newContent);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        timerRef.current = setTimeout(() => {
+            summarizeContent(newContent);
+        }, DEBOUNCE_DELAY);
+    };
+
+    // Handle changes in the pending content for transcribed audio
+    const handleTranscribedInput = (newContent: string) => {
+        setPendingContent((prevContent) => prevContent + " " + newContent);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        timerRef.current = setTimeout(() => {
+            summarizeContent(pendingContent + " " + newContent);
+        }, DEBOUNCE_DELAY);
+    };
 
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
@@ -348,73 +303,149 @@ export default function Component() {
         [notes, currentPage, currentPageTitle]
     );
 
-    // Update the handleManualInput function
-    const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newContent = e.target.value;
-        setPendingContent(newContent);
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        // Check if the input event is a paste event
-        if (e.nativeEvent instanceof InputEvent && e.nativeEvent.inputType === 'insertFromPaste') {
-            // Immediately summarize for paste events
-            summarizeContent(newContent);
-        } else {
-            // Use debounce for regular typing
-            timerRef.current = setTimeout(() => {
-                summarizeContent(newContent);
-            }, DEBOUNCE_DELAY);
-        }
-    };
-    // Handle changes in the pending content for transcribed audio
-    const handleTranscribedInput = (newContent: string) => {
-        setPendingContent((prevContent) => prevContent + " " + newContent);
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        timerRef.current = setTimeout(() => {
-            summarizeContent(pendingContent + " " + newContent);
-        }, DEBOUNCE_DELAY);
+    // Remove duplicate lines from content
+    const removeDuplicates = (content: string) => {
+        const lines = content.split("\n");
+        const uniqueLines = [...new Set(lines)];
+        return uniqueLines.join("\n");
     };
 
-    useEffect(() => {
-        return () => {
-            if (timerRef.current) {
-                clearTimeout(timerRef.current);
-            }
-        };
+    // Insert LaTeX equation into notes
+    const insertMathEquation = () => {
+        if (mathInput.trim()) {
+            const equation = `$${mathInput}$`;
+            setNotes((prevNotes) => {
+                const newNotes = [...prevNotes];
+                const currentNote = newNotes[currentPage];
+                const newContent = removeDuplicates(currentNote.content + `\n${equation}\n`);
+                newNotes[currentPage] = {
+                    ...currentNote,
+                    content: newContent,
+                };
+                return newNotes;
+            });
+            setMathInput("");
+            setIsMathMode(false);
+        }
+    };
+
+    // Render LaTeX in Markdown
+    const renderLaTeX = useCallback((text: string) => {
+        try {
+            const inlineRegex = /\$(.*?)\$/g;
+            const blockRegex = /\$\$(.*?)\$\$/g;
+            return text
+                .split(blockRegex)
+                .map((part, index) => {
+                    if (index % 2 === 1) {
+                        return (
+                            <div
+                                key={index}
+                                dangerouslySetInnerHTML={{
+                                    __html: katex.renderToString(part, {
+                                        throwOnError: false,
+                                        displayMode: true,
+                                    }),
+                                }}
+                            />
+                        );
+                    }
+                    return part
+                        .split(inlineRegex)
+                        .map((subPart, subIndex) => {
+                            if (subIndex % 2 === 1) {
+                                return (
+                                    <span
+                                        key={`${index}-${subIndex}`}
+                                        dangerouslySetInnerHTML={{
+                                            __html: katex.renderToString(subPart, {
+                                                throwOnError: false,
+                                            }),
+                                        }}
+                                    />
+                                );
+                            }
+                            return subPart;
+                        });
+                });
+        } catch (error) {
+            setMathError("Invalid LaTeX input");
+            return text;
+        }
     }, []);
 
-    useEffect(() => {
-        return () => {
-            // Cleanup function
-            if (streamRef.current) {
-                streamRef.current.getTracks().forEach((track) => track.stop());
-            }
+    // Render Markdown with LaTeX support
+    const renderMarkdown = useMemo(() => {
+        return (content: string) => {
+            return (
+                <ReactMarkdown
+                    components={{
+                        p: ({ node, ...props }) => {
+                            const children = React.Children.toArray(props.children);
+                            return (
+                                <p {...props}>
+                                    {children.map((child, index) =>
+                                        typeof child === "string"
+                                            ? renderLaTeX(child)
+                                            : child
+                                    )}
+                                </p>
+                            );
+                        },
+                    }}
+                >
+                    {content}
+                </ReactMarkdown>
+            );
         };
-    }, []);
+    }, [renderLaTeX]);
 
+    // Export notes
+    const exportNotes = async () => {
+        setIsExporting(true);
+        try {
+            const response = await fetch("http://localhost:8000/upload", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(notes),
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            console.log("Notes exported successfully");
+        } catch (error) {
+            console.error("Error exporting notes:", error);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
+    // Open settings modal
     const openSettings = () => {
         setIsSettingsOpen(true);
     };
 
+    // Close settings modal
     const closeSettings = () => {
         setIsSettingsOpen(false);
     };
 
+    // Save settings
     const handleSaveSettings = (settings: { theme: string; font: string; language: string }) => {
         setAppSettings(settings);
         console.log("Settings saved:", settings);
     };
 
+    // Handle math input changes
     const handleMathInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setMathInput(e.target.value);
     };
 
+    // Start recording audio
     const startRecording = async () => {
         try {
             if (!streamRef.current) {
@@ -450,6 +481,7 @@ export default function Component() {
         }
     };
 
+    // Add a new page
     const addNewPage = () => {
         const newNotes = [
             ...notes,
@@ -465,6 +497,7 @@ export default function Component() {
         }, 0);
     };
 
+    // Remove a page
     const removePage = (indexToRemove: number, event: React.MouseEvent) => {
         event.stopPropagation();
         if (notes.length > 1) {
@@ -475,21 +508,7 @@ export default function Component() {
         }
     };
 
-    const protectLaTeX = (content: string) => {
-        // Replace LaTeX blocks with placeholders
-        const latexBlocks: string[] = [];
-        const protectedContent = content.replace(/\$\$.*?\$\$|\$.*?\$/g, (match) => {
-            latexBlocks.push(match);
-            return `@@LaTeX${latexBlocks.length - 1}@@`;
-        });
-        return { protectedContent, latexBlocks };
-    };
-
-    const restoreLaTeX = (content: string, latexBlocks: string[]) => {
-        // Restore LaTeX blocks from placeholders
-        return content.replace(/@@LaTeX(\d+)@@/g, (_, index) => latexBlocks[Number(index)]);
-    };
-
+    // Update page title
     const updatePageTitle = (index: number) => {
         if (currentPageTitle.trim() !== "") {
             setNotes((prevNotes) => {
@@ -501,30 +520,32 @@ export default function Component() {
         setEditingTitle(null);
     };
 
+    // Handle title click
     const handleTitleClick = (index: number) => {
         const currentTime = new Date().getTime();
 
         if (lastClickTime && currentTime - lastClickTime < 300) {
-            // Double click detected
             setEditingTitle(index);
-            setLastClickTime(null); // Reset last click time
+            setLastClickTime(null);
         } else {
-            // Single click
             setCurrentPage(index);
             setLastClickTime(currentTime);
         }
     };
 
+    // Handle title blur
     const handleTitleBlur = () => {
         setEditingTitle(null);
     };
 
+    // Handle title key down
     const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
         if (e.key === "Enter") {
             setEditingTitle(null);
         }
     };
 
+    // Stop recording audio
     const stopRecording = () => {
         if (
             mediaRecorderRef.current &&
@@ -534,6 +555,7 @@ export default function Component() {
         }
     };
 
+    // Start recording cycle
     const startRecordingCycle = useCallback(() => {
         setIsCycling(true);
         const runCycle = () => {
@@ -548,6 +570,7 @@ export default function Component() {
         runCycle();
     }, [CYCLE_DURATION, isCycling]);
 
+    // Stop recording cycle
     const stopRecordingCycle = useCallback(() => {
         setIsCycling(false);
         stopRecording();
@@ -556,22 +579,17 @@ export default function Component() {
         }
     }, []);
 
-    useEffect(() => {
-        if (isCycling) {
-            startRecordingCycle();
-        } else {
-            stopRecordingCycle();
-        }
-    }, [isCycling, startRecordingCycle, stopRecordingCycle]);
-
+    // Toggle recording
     const toggleRecording = () => {
         setIsCycling((prev) => !prev);
     };
 
+    // Toggle edit mode
     const toggleEditMode = () => {
         setEditMode(!editMode);
     };
 
+    // Handle note edit
     const handleNoteEdit = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newContent = e.target.value;
         setNotes(prevNotes => {
@@ -581,43 +599,22 @@ export default function Component() {
         });
     };
 
+    // Handle view click
     const handleViewClick = () => {
         setEditMode(true);
     };
 
+    // Handle edit blur
     const handleEditBlur = () => {
         setEditMode(false);
     };
 
-    /*/const handleTextSelection = useCallback(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-          setSelectedText(selection.toString());
-        }
-      }, []); /*/
-    
-      
-    const saveSelectedText = () => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-          const selected = selection.toString();
-          setSelectedText(selected);
-          console.log("Selected Text:", selected);
-        }
-    };
-      
-    /*/
-    useEffect(() => {
-        document.addEventListener("mouseup", handleTextSelection);
-        return () => {
-            document.removeEventListener("mouseup", handleTextSelection);
-        };
-    }, [handleTextSelection]); /*/
-
+    // Escape regex special characters
     const escapeRegExp = (string: string) => {
-        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
 
+    // Highlight text
     const highlightText = (text: string, highlightedText: string) => {
         if (!highlightedText) return text;
         const escapedHighlightedText = escapeRegExp(highlightedText);
@@ -629,15 +626,16 @@ export default function Component() {
         );
     };
 
+    // Initialize mermaid
     useEffect(() => {
         mermaid.initialize({ startOnLoad: true });
     }, []);
 
-    // Update the setCurrentPage function to reset currentDiagram
+    // Set current page
     const handleSetCurrentPage = (index: number) => {
         setCurrentPage(index);
-        setMathInput(""); // Clear math input
-        setIsMathMode(false); // Exit math mode
+        setMathInput("");
+        setIsMathMode(false);
     };
 
     return (
@@ -677,9 +675,29 @@ export default function Component() {
                             >
                                 Save Selected Text
                             </Button>
+                            <Button
+                                onClick={solveSelectedEquation}
+                                disabled={isSolving || selectedText.trim() === ""}
+                                className="bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700"
+                            >
+                                {isSolving ? (
+                                    <Loader2 className="animate-spin h-5 w-5 text-white" />
+                                ) : (
+                                    "Solve Equation"
+                                )}
+                            </Button>
                             <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
                                 <strong>Selected Text:</strong>
                                 <p>{selectedText}</p>
+                                {mathSolution && (
+                                    <>
+                                        <strong>Solution:</strong>
+                                        <p>{mathSolution}</p>
+                                    </>
+                                )}
+                                {error && (
+                                    <p className="text-red-500">{error}</p>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -740,14 +758,9 @@ export default function Component() {
                         <div className="flex-grow flex flex-col h-[calc(100%-4rem)]">
                             <div className="h-3/4 mb-4">
                                 {editMode ? (
-                                    <Textarea
-                                        value={notes[currentPage]?.content || ""}
+                                    <NoteEditor
+                                        content={notes[currentPage]?.content || ""}
                                         onChange={handleNoteEdit}
-                                        onBlur={handleEditBlur}
-                                        placeholder="Edit your note here..."
-                                        className="w-full h-full text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white dark:border-gray-600"
-                                        aria-label="Edit Note"
-                                        autoFocus
                                     />
                                 ) : (
                                     <div
@@ -758,7 +771,6 @@ export default function Component() {
                                     </div>
                                 )}
                             </div>
-                            {/* Math mode UI */}
                             {isMathMode && (
                                 <div className="mt-4">
                                     <Textarea
