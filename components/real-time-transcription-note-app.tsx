@@ -148,6 +148,7 @@ export default function Component() {
     const [selectedText, setSelectedText] = useState("");
     const [mathSolution, setMathSolution] = useState("");
     const [isSolving, setIsSolving] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -186,16 +187,6 @@ export default function Component() {
             mathInputRef.current.focus();
         }
     }, [isMathMode]);
-
-    // Save selected text to state
-    const saveSelectedText = () => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-            const selected = selection.toString();
-            setSelectedText(selected);
-            console.log("Selected Text:", selected);
-        }
-    };
 
     // Function to call the Groq API
     const solveWithGroq = async (latex: any) => {
@@ -243,32 +234,6 @@ export default function Component() {
         }
     };
 
-    // Handle manual input with debouncing
-    const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newContent = e.target.value;
-        setPendingContent(newContent);
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        timerRef.current = setTimeout(() => {
-            summarizeContent(newContent);
-        }, DEBOUNCE_DELAY);
-    };
-
-    // Handle changes in the pending content for transcribed audio
-    const handleTranscribedInput = (newContent: string) => {
-        setPendingContent((prevContent) => prevContent + " " + newContent);
-
-        if (timerRef.current) {
-            clearTimeout(timerRef.current);
-        }
-
-        timerRef.current = setTimeout(() => {
-            summarizeContent(pendingContent + " " + newContent);
-        }, DEBOUNCE_DELAY);
-    };
 
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
@@ -326,6 +291,41 @@ export default function Component() {
         },
         [notes, currentPage, currentPageTitle]
     );
+
+    // Update the handleManualInput function
+    const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+        const newContent = e.target.value;
+        setPendingContent(newContent);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        // Check if the input event is a paste event
+        if (e.nativeEvent instanceof InputEvent && e.nativeEvent.inputType === 'insertFromPaste') {
+            // Immediately summarize for paste events
+            summarizeContent(newContent);
+        } else {
+            // Use debounce for regular typing
+            timerRef.current = setTimeout(() => {
+                summarizeContent(newContent);
+            }, DEBOUNCE_DELAY);
+        }
+    };
+
+
+    // Handle changes in the pending content for transcribed audio
+    const handleTranscribedInput = (newContent: string) => {
+        setPendingContent((prevContent) => prevContent + " " + newContent);
+
+        if (timerRef.current) {
+            clearTimeout(timerRef.current);
+        }
+
+        timerRef.current = setTimeout(() => {
+            summarizeContent(pendingContent + " " + newContent);
+        }, DEBOUNCE_DELAY);
+    };
 
     // Remove duplicate lines from content
     const removeDuplicates = (content: string) => {
@@ -633,7 +633,31 @@ export default function Component() {
         setEditMode(false);
     };
 
-    // Escape regex special characters
+    /*/const handleTextSelection = useCallback(() => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          setSelectedText(selection.toString());
+        }
+      }, []); /*/
+    
+      
+    const saveSelectedText = () => {
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) {
+          const selected = selection.toString();
+          setSelectedText(selected);
+          console.log("Selected Text:", selected);
+        }
+    };
+      
+    /*/
+    useEffect(() => {
+        document.addEventListener("mouseup", handleTextSelection);
+        return () => {
+            document.removeEventListener("mouseup", handleTextSelection);
+        };
+    }, [handleTextSelection]); /*/
+
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     };
@@ -662,6 +686,10 @@ export default function Component() {
         setIsMathMode(false);
     };
 
+    const toggleSidebar = () => {
+        setIsSidebarOpen((prev) => !prev);
+    };
+
     return (
         <div className={`${appSettings.theme === "dark" ? "dark" : ""}`}>
             <div className="max-h-[calc(100vh-28px)] bg-gray-50 dark:bg-gray-900 flex flex-col w-full">
@@ -682,10 +710,6 @@ export default function Component() {
                                 ) : (
                                     "Export Notes"
                                 )}
-                            </Button>
-                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700">
-                                <Settings className="mr-2" />
-                                Settings
                             </Button>
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
@@ -728,6 +752,27 @@ export default function Component() {
                 </header>
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
                     <div className="w-full h-full flex flex-col">
+                        <Button
+                            onClick={toggleSidebar}
+                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2">
+                            {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                        </Button>
+                        <aside className={`w-64 bg-gray-800 text-white flex-shrink-0 sidebar ${isSidebarOpen ? '' : 'sidebar-hidden'}`}>
+                            <nav className="flex flex-col p-4 space-y-4">
+                                <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
+                                    Settings
+                                </Button>
+                                <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
+                                    Notes
+                                </Button>
+                                <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
+                                    Quiz
+                                </Button>
+                                <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
+                                    Flashcard
+                                </Button>
+                            </nav>
+                        </aside>
                         <div className="flex items-center space-x-2 overflow-x-auto mb-4 pr-32 relative">
                             {notes.map((note, index) => (
                                 <div key={index} className="flex-shrink-0 relative group">
@@ -847,6 +892,7 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
+
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}

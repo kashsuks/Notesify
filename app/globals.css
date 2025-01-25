@@ -92,3 +92,21 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+/* Add this to your CSS file */
+@layer base {
+    * {
+      @apply border-border;
+    }
+    body {
+      @apply bg-background text-foreground;
+    }
+  }
+  
+  .sidebar {
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .sidebar-hidden {
+    transform: translateX(-100%);
+  }
