@@ -50,7 +50,7 @@ export async function POST(req) {
           Provide the coherent, regenerated transcription here. Do not prepend the response with any padding such as a label or instructions.`;
 
           const { text } = await generateText({
-            model: groq2('llama-3.1-70b-versatile'),
+            model: groq2('llama-3.3-70b-versatile'),
             prompt,
           });
 
