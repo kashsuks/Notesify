@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Mic, MicOff, Plus, X, Image, Settings } from "lucide-react";
 import ReactMarkdown from "react-markdown";
+import DiagramGenerator from "@/components/diagram-generator";
 import mermaid from "mermaid";
+import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
@@ -84,9 +86,16 @@ const transcribeAudioChunk = async (audioChunk: Blob, text: string) => {
     }
 };
 
+interface Diagram {
+    id: string;
+    code: string;
+    text: string;
+}
+
 interface Note {
     title: string;
     content: string;
+    diagrams: Diagram[];
 }
 
 const protectLaTeX = (content: string) => {
@@ -106,7 +115,7 @@ const restoreLaTeX = (content: string, latexBlocks: string[]) => {
 
 export default function Component() {
     const [notes, setNotes] = useState<Note[]>([
-        { title: "Untitled Note", content: "" },
+        { title: "Untitled Note", content: "", diagrams: [] },
     ]);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [appSettings, setAppSettings] = useState({
@@ -114,6 +123,7 @@ export default function Component() {
         font: "sans-serif",
         language: "en",
     });
+    const [showDiagrams] = useState(false);
     const [currentPage, setCurrentPage] = useState(0);
     const [currentPageTitle, setCurrentPageTitle] = useState("");
     const [isSummarizing, setIsSummarizing] = useState(false);
@@ -122,6 +132,7 @@ export default function Component() {
     const [editingTitle, setEditingTitle] = useState<number | null>(null);
     const [error, setError] = useState("");
     const [lastClickTime, setLastClickTime] = useState<number | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedText, setSelectedText] = useState("");
 
@@ -257,6 +268,29 @@ export default function Component() {
         );
     };
 
+    const exportNotes = async () => {
+        setIsExporting(true);
+        try {
+          const response = await fetch("http://localhost:8000/upload", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(notes),
+          });
+      
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+      
+          // console.log("Notes exported successfully");
+        } catch (error) {
+          console.error("Error exporting notes:", error);
+        } finally {
+          setIsExporting(false);
+        }
+      };
+
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
         (content: string) => {
@@ -283,6 +317,7 @@ export default function Component() {
                         const newNote = {
                             title: result.currentContext,
                             content: uniqueContent,
+                            diagrams: [],
                         };
 
                         if (isDefaultTitle && isEmptyNote) {
@@ -418,7 +453,7 @@ export default function Component() {
     const addNewPage = () => {
         const newNotes = [
             ...notes,
-            { title: `Untitled Note ${notes.length + 1}`, content: "" },
+            { title: `Untitled Note ${notes.length + 1}`, content: "", diagrams: [] },
         ];
         setNotes(newNotes);
         setCurrentPage(newNotes.length - 1);
@@ -598,6 +633,7 @@ export default function Component() {
         mermaid.initialize({ startOnLoad: true });
     }, []);
 
+    // Update the setCurrentPage function to reset currentDiagram
     const handleSetCurrentPage = (index: number) => {
         setCurrentPage(index);
         setMathInput(""); // Clear math input
@@ -618,11 +654,17 @@ export default function Component() {
                                 {isCycling ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
                                 {isCycling ? "Stop Recording" : "Start Recording"}
                             </Button>
+                            <Button onClick={exportNotes} className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700">
+                                {isExporting ? (
+                                    <Loader2 className="animate-spin h-5 w-5 text-white" />
+                                ) : (
+                                    "Export Notes"
+                                )}
+                            </Button>
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600 dark:bg-purple-600 dark:hover:bg-purple-700">
                                 <Settings className="mr-2" />
                                 Settings
                             </Button>
-                            {/* Added: Button to toggle math mode */}
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
                                 className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
@@ -643,7 +685,7 @@ export default function Component() {
                     </div>
                 </header>
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
-                    <div className={`${'w-full'} w-2/3 h-full flex flex-col`}>
+                    <div className="w-full h-full flex flex-col">
                         <div className="flex items-center space-x-2 overflow-x-auto mb-4 pr-32 relative">
                             {notes.map((note, index) => (
                                 <div key={index} className="flex-shrink-0 relative group">
@@ -716,7 +758,7 @@ export default function Component() {
                                     </div>
                                 )}
                             </div>
-                            {/* Added: Math mode UI */}
+                            {/* Math mode UI */}
                             {isMathMode && (
                                 <div className="mt-4">
                                     <Textarea
@@ -743,29 +785,20 @@ export default function Component() {
                                 </div>
                             )}
                             <div className="h-1/4 relative">
-                                {editMode ? (
-                                    <Textarea
-                                        value={pendingContent}
-                                        onChange={handleManualInput}
-                                        onPaste={(e) => {
-                                            e.preventDefault();
-                                            const pastedText = e.clipboardData.getData("text");
-                                            const newContent = pendingContent + pastedText;
-                                            setPendingContent(newContent);
-                                            summarizeContent(newContent);
-                                        }}
-                                        placeholder="Type or record your notes here..."
-                                        className="w-full h-full text-lg p-2 rounded-lg shadow-inner bg-blue-100 focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white"
-                                        aria-label="Pending Note Input"
-                                    />
-                                ) : (
-                                    <div
-                                        onClick={handleViewClick}
-                                        className="w-full h-full bg-white border-2 text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out overflow-y-auto cursor-text dark:bg-gray-700 dark:text-white"
-                                    >
-                                        {renderMarkdown(pendingContent || "Click to edit...")}
-                                    </div>
-                                )}
+                                <Textarea
+                                    value={pendingContent}
+                                    onChange={handleManualInput}
+                                    onPaste={(e) => {
+                                        e.preventDefault();
+                                        const pastedText = e.clipboardData.getData("text");
+                                        const newContent = pendingContent + pastedText;
+                                        setPendingContent(newContent);
+                                        summarizeContent(newContent);
+                                    }}
+                                    placeholder="Type or record your notes here..."
+                                    className="w-full h-full text-lg p-2 rounded-lg shadow-inner bg-blue-100 focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white"
+                                    aria-label="Pending Note Input"
+                                />
                                 <div className="absolute bottom-4 right-4 flex items-center space-x-2">
                                     {isSummarizing && (
                                         <Loader2 className="animate-spin h-5 w-5 text-gray-400 dark:text-gray-300" />
