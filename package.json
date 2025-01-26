@@ -27,6 +27,7 @@
     "express": "^4.21.2",
     "express-openid-connect": "^2.17.1",
     "groq-sdk": "^0.3.2",
+    "gumloop": "^1.0.2",
     "katex": "^0.16.21",
     "lucide-react": "^0.453.0",
     "mathlive": "^0.103.0",
