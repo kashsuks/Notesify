@@ -846,10 +846,7 @@ export default function Component() {
         <div className={`${appSettings.theme === "dark" ? "dark" : ""}`}>
             <div className="max-h-[calc(100vh-28px)] bg-gray-50 dark:bg-gray-900 flex flex-col w-full">
                 <header className="bg-white dark:bg-gray-800 shadow-sm">
-                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white">
-                            <a href="/" className="nav-link">Notesify</a>
-                        </h1>
+                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-center items-center"> {/* Changed `justify-between` to `justify-center` */}
                         <div className="flex items-center space-x-4">
                             {/* Recording Button */}
                             <Button
@@ -905,12 +902,17 @@ export default function Component() {
                         </div>
                     </div>
                 </header>
+
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
                     {/* Sidebar */}
                     <aside
                         className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                             } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
+                        {/* Add the "Notesify" title here */}
+                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white p-4">
+                            <a href="/" className="nav-link">Notesify</a>
+                        </h1>
                         <nav className="flex flex-col p-4 space-y-8">
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                 Settings
@@ -962,7 +964,7 @@ export default function Component() {
                                                 setCurrentPageTitle(note.title);
                                             }}
                                             className={`
-                                                ${currentPage === index
+                                ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
                                                 } transition-colors duration-200 pr-8 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105
