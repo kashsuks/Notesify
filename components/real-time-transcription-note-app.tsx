@@ -747,7 +747,7 @@ export default function Component() {
                             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                         } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
-                        <nav className="flex flex-col p-4 space-y-4">
+                        <nav className="flex flex-col p-4 space-y-8"> {/* Increased spacing to space-y-8 */}
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
                                 Settings
                             </Button>
