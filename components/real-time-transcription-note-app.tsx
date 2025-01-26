@@ -647,7 +647,12 @@ export default function Component() {
     const removePage = (indexToRemove: number, event: React.MouseEvent) => {
         event.stopPropagation();
         if (notes.length > 1) {
-            setNotes((prevNotes) => prevNotes.filter((_, index) => index !== indexToRemove));
+            const updatedNotes = notes.filter((_, index) => index !== indexToRemove);
+            setNotes(updatedNotes);
+            
+            // Update localStorage
+            localStorage.setItem('notesifyNotes', JSON.stringify(updatedNotes));
+            
             if (currentPage >= indexToRemove && currentPage > 0) {
                 setCurrentPage(currentPage - 1);
             }
