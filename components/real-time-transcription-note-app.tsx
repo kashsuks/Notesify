@@ -12,6 +12,7 @@ import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { Menu } from "lucide-react";
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -146,8 +147,9 @@ export default function Component() {
     const [isExporting, setIsExporting] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedText, setSelectedText] = useState("");
-    const [mathSolution, setMathSolution] = useState("");
+    const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
+    
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -224,8 +226,13 @@ export default function Component() {
         try {
             // Call the Groq API to solve the LaTeX equation
             const solution = await solveWithGroq(selectedText);
-            setMathSolution(solution); // Set the step-by-step solution
-            console.log("Step-by-step solution:", solution);
+            
+            // Split the solution into sentences
+            const sentences: string[] = solution.split('. ').map((sentence: string) => sentence.trim() + '.');
+            
+            // Set the step-by-step solution as an array of sentences
+            setMathSolution(sentences);
+            console.log("Step-by-step solution:", sentences);
         } catch (error) {
             console.error("Error solving equation:", error);
             setError("Failed to solve the equation.");
@@ -233,7 +240,6 @@ export default function Component() {
             setIsSolving(false);
         }
     };
-
 
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
@@ -313,7 +319,6 @@ export default function Component() {
         }
     };
 
-
     // Handle changes in the pending content for transcribed audio
     const handleTranscribedInput = (newContent: string) => {
         setPendingContent((prevContent) => prevContent + " " + newContent);
@@ -362,36 +367,24 @@ export default function Component() {
                 .split(blockRegex)
                 .map((part, index) => {
                     if (index % 2 === 1) {
-                        return (
-                            <div
-                                key={index}
-                                dangerouslySetInnerHTML={{
-                                    __html: katex.renderToString(part, {
-                                        throwOnError: false,
-                                        displayMode: true,
-                                    }),
-                                }}
-                            />
-                        );
+                        return katex.renderToString(part, {
+                            throwOnError: false,
+                            displayMode: true,
+                        });
                     }
                     return part
                         .split(inlineRegex)
                         .map((subPart, subIndex) => {
                             if (subIndex % 2 === 1) {
-                                return (
-                                    <span
-                                        key={`${index}-${subIndex}`}
-                                        dangerouslySetInnerHTML={{
-                                            __html: katex.renderToString(subPart, {
-                                                throwOnError: false,
-                                            }),
-                                        }}
-                                    />
-                                );
+                                return katex.renderToString(subPart, {
+                                    throwOnError: false,
+                                });
                             }
                             return subPart;
-                        });
-                });
+                        })
+                        .join('');
+                })
+                .join('');
         } catch (error) {
             setMathError("Invalid LaTeX input");
             return text;
@@ -423,6 +416,18 @@ export default function Component() {
             );
         };
     }, [renderLaTeX]);
+
+    const renderSolution = (solution: string[]) => {
+        return solution.map((sentence, index) => (
+            <div 
+                key={index} 
+                className="mb-2"
+                dangerouslySetInnerHTML={{ 
+                    __html: renderLaTeX(sentence) 
+                }}
+            />
+        ));
+    };
 
     // Export notes
     const exportNotes = async () => {
@@ -641,14 +646,6 @@ export default function Component() {
         setEditMode(false);
     };
 
-    /*/const handleTextSelection = useCallback(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-          setSelectedText(selection.toString());
-        }
-      }, []); /*/
-    
-      
     const saveSelectedText = () => {
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) {
@@ -657,14 +654,6 @@ export default function Component() {
           console.log("Selected Text:", selected);
         }
     };
-      
-    /*/
-    useEffect(() => {
-        document.addEventListener("mouseup", handleTextSelection);
-        return () => {
-            document.removeEventListener("mouseup", handleTextSelection);
-        };
-    }, [handleTextSelection]); /*/
 
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -745,10 +734,10 @@ export default function Component() {
                             <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
                                 <strong>Selected Text:</strong>
                                 <p>{selectedText}</p>
-                                {mathSolution && (
+                                {mathSolution.length > 0 && (
                                     <>
                                         <strong>Solution:</strong>
-                                        <p>{mathSolution}</p>
+                                        {renderSolution(mathSolution)}
                                     </>
                                 )}
                                 {error && (
@@ -759,28 +748,40 @@ export default function Component() {
                     </div>
                 </header>
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
-                    <div className="w-full h-full flex flex-col">
+                    {/* Sidebar */}
+                    <aside
+                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${
+                            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                        } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
+                    >
+                        <nav className="flex flex-col p-4 space-y-4">
+                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
+                                Settings
+                            </Button>
+                            <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
+                                Notes
+                            </Button>
+                            <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
+                                Quiz
+                            </Button>
+                            <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
+                                Flashcard
+                            </Button>
+                        </nav>
+                    </aside>
+
+                    {/* Notes Section */}
+                    <div
+                        className={`flex-grow transition-all duration-300 ease-in-out ${
+                            isSidebarOpen ? "ml-64" : "ml-0"
+                        }`}
+                    >
                         <Button
                             onClick={toggleSidebar}
-                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2">
-                            {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2"
+                        >
+                            <Menu className="h-6 w-6" />
                         </Button>
-                        <aside className={`w-64 bg-gray-800 text-white flex-shrink-0 sidebar ${isSidebarOpen ? '' : 'sidebar-hidden'}`}>
-                            <nav className="flex flex-col p-4 space-y-4">
-                                <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
-                                    Settings
-                                </Button>
-                                <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
-                                    Notes
-                                </Button>
-                                <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
-                                    Quiz
-                                </Button>
-                                <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
-                                    Flashcard
-                                </Button>
-                            </nav>
-                        </aside>
                         <div className="flex items-center space-x-2 overflow-x-auto mb-4 pr-32 relative">
                             {notes.map((note, index) => (
                                 <div key={index} className="flex-shrink-0 relative group">
