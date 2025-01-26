@@ -469,41 +469,49 @@ export default function Component() {
         setMathInput(e.target.value);
     };
 
+    useEffect(() => {
+        if (isCycling) {
+          startRecordingCycle();
+        } else {
+          stopRecordingCycle();
+        }
+      }, [isCycling]);
+
     // Start recording audio
     const startRecording = async () => {
         try {
-            if (!streamRef.current) {
-                streamRef.current = await navigator.mediaDevices.getUserMedia({
-                    audio: true,
-                });
+          if (!streamRef.current) {
+            streamRef.current = await navigator.mediaDevices.getUserMedia({
+              audio: true,
+            });
+          }
+          const mediaRecorder = new MediaRecorder(streamRef.current);
+          mediaRecorderRef.current = mediaRecorder;
+          audioChunksRef.current = [];
+      
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunksRef.current.push(event.data);
             }
-            const mediaRecorder = new MediaRecorder(streamRef.current);
-            mediaRecorderRef.current = mediaRecorder;
-            audioChunksRef.current = [];
-
-            mediaRecorder.ondataavailable = (event) => {
-                if (event.data.size > 0) {
-                    audioChunksRef.current.push(event.data);
-                }
-            };
-
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunksRef.current, {
-                    type: "audio/webm",
-                });
-                try {
-                    const result = await transcribeAudioChunk(audioBlob, pendingContent);
-                    handleTranscribedInput(result.text);
-                } catch (error) {
-                    console.error("Transcription error:", error);
-                }
-            };
-
-            mediaRecorder.start();
+          };
+      
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunksRef.current, {
+              type: "audio/webm",
+            });
+            try {
+              const result = await transcribeAudioChunk(audioBlob, pendingContent);
+              handleTranscribedInput(result.text);
+            } catch (error) {
+              console.error("Transcription error:", error);
+            }
+          };
+      
+          mediaRecorder.start();
         } catch (error) {
-            console.error("Error accessing microphone:", error);
+          console.error("Error accessing microphone:", error);
         }
-    };
+      };
 
     // Add a new page
     const addNewPage = () => {
