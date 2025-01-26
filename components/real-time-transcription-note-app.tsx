@@ -723,56 +723,60 @@ export default function Component() {
                             >
                                 Save Selected Text
                             </Button>
-                            <Button
-                                onClick={solveSelectedEquation}
-                                disabled={isSolving || selectedText.trim() === ""}
-                                className="bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700"
-                            >
-                                {isSolving ? (
-                                    <Loader2 className="animate-spin h-5 w-5 text-white" />
-                                ) : (
-                                    "Solve Equation"
-                                )}
-                            </Button>
                             <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
                                 <strong>Selected Text:</strong>
                                 <p>{selectedText}</p>
-                                {mathSolution && (
-                                    <>
-                                        <strong>Solution:</strong>
-                                        <p>{mathSolution}</p>
-                                    </>
-                                )}
-                                {error && (
-                                    <p className="text-red-500">{error}</p>
-                                )}
                             </div>
                         </div>
                     </div>
                 </header>
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
-                    <div className="w-full h-full flex flex-col">
-                        <Button
-                            onClick={toggleSidebar}
-                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2">
-                            {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
-                        </Button>
-                        <aside className={`w-64 bg-gray-800 text-white flex-shrink-0 sidebar ${isSidebarOpen ? '' : 'sidebar-hidden'}`}>
-                            <nav className="flex flex-col p-4 space-y-4">
-                                <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
-                                    Settings
-                                </Button>
-                                <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
-                                    Notes
-                                </Button>
-                                <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
-                                    Quiz
-                                </Button>
-                                <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
-                                    Flashcard
-                                </Button>
-                            </nav>
-                        </aside>
+                    {/* Hamburger Menu Button */}
+                    <Button
+                        onClick={toggleSidebar}
+                        className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2"
+                    >
+                        <svg
+                            className="w-6 h-6"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                            xmlns="http://www.w3.org/2000/svg"
+                        >
+                            <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth="2"
+                                d="M4 6h16M4 12h16M4 18h16"
+                            />
+                        </svg>
+                    </Button>
+    
+                    {/* Collapsible Sidebar */}
+                    <aside
+                        className={`w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out transform ${
+                            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                        }`}
+                    >
+                        <nav className="flex flex-col p-4 space-y-4 h-full">
+                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600 w-full">
+                                Settings
+                            </Button>
+                            <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600 w-full">
+                                Notes
+                            </Button>
+                            <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600 w-full">
+                                Quiz
+                            </Button>
+                            <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600 w-full">
+                                Flashcard
+                            </Button>
+                        </nav>
+                    </aside>
+    
+                    {/* Main Content Area */}
+                    <div className="flex-grow flex flex-col transition-all duration-300 ease-in-out">
+                        {/* Page Tabs */}
                         <div className="flex items-center space-x-2 overflow-x-auto mb-4 pr-32 relative">
                             {notes.map((note, index) => (
                                 <div key={index} className="flex-shrink-0 relative group">
@@ -797,11 +801,11 @@ export default function Component() {
                                                 setCurrentPageTitle(note.title);
                                             }}
                                             className={`
-                        ${currentPage === index
+                                                ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
                                                 } transition-colors duration-200 pr-8
-                      `}
+                                            `}
                                         >
                                             {note.title}
                                         </Button>
@@ -824,12 +828,19 @@ export default function Component() {
                                 <Plus className="size-6" />
                             </button>
                         </div>
+    
+                        {/* Main Content Area */}
                         <div className="flex-grow flex flex-col h-[calc(100%-4rem)]">
                             <div className="h-3/4 mb-4">
                                 {editMode ? (
-                                    <NoteEditor
-                                        content={notes[currentPage]?.content || ""}
+                                    <Textarea
+                                        value={notes[currentPage]?.content || ""}
                                         onChange={handleNoteEdit}
+                                        onBlur={handleEditBlur}
+                                        placeholder="Edit your note here..."
+                                        className="w-full h-full text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white dark:border-gray-600"
+                                        aria-label="Edit Note"
+                                        autoFocus
                                     />
                                 ) : (
                                     <div
@@ -840,6 +851,8 @@ export default function Component() {
                                     </div>
                                 )}
                             </div>
+    
+                            {/* Math Mode UI */}
                             {isMathMode && (
                                 <div className="mt-4">
                                     <Textarea
@@ -865,6 +878,8 @@ export default function Component() {
                                     </div>
                                 </div>
                             )}
+    
+                            {/* Pending Content Input */}
                             <div className="h-1/4 relative">
                                 <Textarea
                                     value={pendingContent}
@@ -892,7 +907,8 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
-
+    
+                        {/* Error Display */}
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}
@@ -900,6 +916,8 @@ export default function Component() {
                         )}
                     </div>
                 </main>
+    
+                {/* Settings Modal */}
                 {isSettingsOpen && (
                     <SettingsModal
                         isOpen={isSettingsOpen}
@@ -909,5 +927,4 @@ export default function Component() {
                 )}
             </div>
         </div>
-    );
-}
+    )};
