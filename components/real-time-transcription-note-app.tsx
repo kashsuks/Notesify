@@ -14,6 +14,8 @@ import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Menu } from "lucide-react";
+import QuizModal from "@/components/QuizModal";
+
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -136,6 +138,16 @@ export default function Component() {
         font: "sans-serif",
         language: "en",
     });
+    const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+    const [quizSettings, setQuizSettings] = useState({
+        topic: "",
+        quizType: "Multiple Choice",
+        audience: "",
+        difficultyLevel: "Hard",
+        numQuestions: 5,
+        answerKey: "No",
+        additionalNotes: "",
+    });
     const [showDiagrams] = useState(false);
     const [currentPage, setCurrentPage] = useState(0);
     const [currentPageTitle, setCurrentPageTitle] = useState("");
@@ -150,7 +162,7 @@ export default function Component() {
     const [selectedText, setSelectedText] = useState("");
     const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
-    
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -170,6 +182,9 @@ export default function Component() {
     const mathInputRef = useRef<HTMLTextAreaElement>(null);
 
     const [notesBoxKey, setNotesBoxKey] = useState(0);
+    const [generatedOutput, setGeneratedOutput] = useState<string | null>(null);
+
+
 
     // Handle keyboard shortcut for math mode
     useEffect(() => {
@@ -229,10 +244,10 @@ export default function Component() {
         try {
             // Call the Groq API to solve the LaTeX equation
             const solution = await solveWithGroq(selectedText);
-            
+
             // Split the solution into sentences
             const sentences: string[] = solution.split('. ').map((sentence: string) => sentence.trim() + '.');
-            
+
             // Set the step-by-step solution as an array of sentences
             setMathSolution(sentences);
             console.log("Step-by-step solution:", sentences);
@@ -432,10 +447,10 @@ export default function Component() {
 
     const renderSolution = (solution: string[]) => {
         return solution.map((sentence, index) => (
-            <div 
-                key={index} 
+            <div
+                key={index}
                 className="mb-2"
-                dangerouslySetInnerHTML={{ 
+                dangerouslySetInnerHTML={{
                     __html: katex.renderToString(sentence, {
                         throwOnError: false,
                     }),
@@ -479,11 +494,60 @@ export default function Component() {
     };
 
     // Save settings
-    const handleSaveSettings = (settings: { theme: string; font: string; language: string }) => {
-        setAppSettings(settings);
-        console.log("Settings saved:", settings);
+    const handleSaveSettings = (appSettings: { theme: string; font: string; language: string }) => {
+        setAppSettings(appSettings);
+        console.log("Settings saved:", appSettings);
     };
 
+
+    // Open quiz modal
+    const openQuizModal = () => {
+        setIsQuizModalOpen(true);
+    };
+
+    // Close quiz modal
+    const closeQuizModal = () => {
+        setIsQuizModalOpen(false);
+    };
+
+    const handleSaveQuiz = (settings: typeof quizSettings) => {
+        const options = {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${process.env.GUMLOOP_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: "hN5cnq9HEnaSxYyFwCrS9h8fRvN2",
+                saved_item_id: "9y5oSctDArBsbQmK1UCXii",
+                pipeline_inputs: [
+                    { name: "topic", value: settings.topic },
+                    { name: "quizType", value: settings.quizType },
+                    { name: "audience", value: settings.audience },
+                    { name: "difficultyLevel", value: settings.difficultyLevel },
+                    { name: "numQuestions", value: settings.numQuestions.toString() },
+                    { name: "answerKey", value: settings.answerKey },
+                    { name: "additionalNotes", value: settings.additionalNotes },
+                ],
+            }),
+        };
+
+        fetch("https://api.gumloop.com/api/v1/start_pipeline", options)
+            .then((response) => response.json())
+            .then((response) => {
+                console.log("Full response:", response); // Log full response for debugging
+                setGeneratedOutput(response.result || "No output generated."); // Assuming the response has a `result` field
+
+                alert("Response from Gumloops: " + JSON.stringify(response));
+                setQuizSettings(settings);
+                closeQuizModal(); // Close the modal after successful submission
+            })
+            .catch((err) => {
+                console.error("Error:", err);
+                alert("Failed to create quiz.");
+            });
+
+    };
     // Handle math input changes
     const handleMathInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setMathInput(e.target.value);
@@ -781,9 +845,8 @@ export default function Component() {
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
                     {/* Sidebar */}
                     <aside
-                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${
-                            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                        } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
+                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                            } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
                         <nav className="flex flex-col p-4 space-y-8">
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
@@ -792,20 +855,19 @@ export default function Component() {
                             <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
                                 Notes
                             </Button>
-                            <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
-                                Quiz
+                            <Button onClick={openQuizModal} className="bg-green-500 hover:bg-green-600">
+                                Create Quiz
                             </Button>
                             <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
                                 Flashcard
                             </Button>
                         </nav>
                     </aside>
-    
+
                     {/* Notes Section */}
                     <div
-                        className={`flex-grow transition-all duration-300 ease-in-out ${
-                            isSidebarOpen ? "ml-64" : "ml-0"
-                        }`}
+                        className={`flex-grow transition-all duration-300 ease-in-out ${isSidebarOpen ? "ml-64" : "ml-0"
+                            }`}
                     >
                         <Button
                             onClick={toggleSidebar}
@@ -934,7 +996,7 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
-    
+
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}
@@ -949,6 +1011,20 @@ export default function Component() {
                         onSave={handleSaveSettings}
                     />
                 )}
+                {isQuizModalOpen && (
+                    <QuizModal
+                        isOpen={isQuizModalOpen}
+                        onClose={() => setIsQuizModalOpen(false)}
+                        onRun={handleSaveQuiz}
+                    />
+                )}
+                {generatedOutput && (
+                    <div className="mt-6">
+                        <h2 className="text-lg font-bold">Generated Output:</h2>
+                        <pre className="p-4 bg-gray-100 rounded-lg border">{generatedOutput}</pre>
+                    </div>
+                )}
             </div>
         </div>
-    )};
+    )
+};
