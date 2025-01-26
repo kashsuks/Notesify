@@ -136,3 +136,7 @@ body {
 .login-button:hover {
   background-color: #0056b3;
 }
+
+.nav-link {
+  color: #007bff;
+}

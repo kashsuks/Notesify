@@ -19,8 +19,6 @@ import { GumloopClient } from "gumloop";
 import OutputOverlay from "@/components/OutputOverlay"; // Import OutputOverlay
 
 
-
-
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
 
@@ -191,11 +189,11 @@ export default function Component() {
 
     const saveNotesToLocalStorage = (notes: Note[]) => {
         const serializedNotes = notes.map(note => ({
-          ...note,
-          id: crypto.randomUUID(), // Generate a unique ID for each note
-          lastModified: new Date().toISOString()
+            ...note,
+            id: crypto.randomUUID(), // Generate a unique ID for each note
+            lastModified: new Date().toISOString()
         }));
-        
+
         localStorage.setItem('notesifyNotes', JSON.stringify(serializedNotes));
     };
 
@@ -276,78 +274,78 @@ export default function Component() {
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
         (content: string) => {
-          const { protectedContent, latexBlocks } = protectLaTeX(content);
-          setIsSummarizing(true);
-          const titles = notes.map((note) => note.title);
-          summarizeNote(
-            notes[currentPage].content,
-            protectedContent,
-            currentPageTitle,
-            titles,
-            notes
-          ).then((result) => {
-            setIsSummarizing(false);
-            setSummarizeStatus(result.message);
-            if (result.success) {
-              const restoredContent = restoreLaTeX(result.summary, latexBlocks);
-              const uniqueContent = removeDuplicates(restoredContent);
-              setNotes((oldNotes) => {
-                const newNotes = [...oldNotes];
-                const currentNote = newNotes[currentPage];
-                const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
-                const isEmptyNote = currentNote.content.trim() === "";
-                const newNote = {
-                  title: result.currentContext,
-                  content: uniqueContent,
-                  diagrams: [],
-                };
-      
-                if (isDefaultTitle && isEmptyNote) {
-                  newNotes[currentPage] = newNote;
-                } else {
-                  const noteIndex = newNotes.findIndex(
-                    (note) => note.title === newNote.title
-                  );
-      
-                  if (noteIndex !== -1) {
-                    newNotes[noteIndex] = newNote;
-                    setCurrentPage(noteIndex);
-                  } else if (!result.createNewContext) {
-                    newNotes[currentPage] = newNote;
-                  } else {
-                    newNotes.push(newNote);
-                    setCurrentPage(newNotes.length - 1);
-                  }
+            const { protectedContent, latexBlocks } = protectLaTeX(content);
+            setIsSummarizing(true);
+            const titles = notes.map((note) => note.title);
+            summarizeNote(
+                notes[currentPage].content,
+                protectedContent,
+                currentPageTitle,
+                titles,
+                notes
+            ).then((result) => {
+                setIsSummarizing(false);
+                setSummarizeStatus(result.message);
+                if (result.success) {
+                    const restoredContent = restoreLaTeX(result.summary, latexBlocks);
+                    const uniqueContent = removeDuplicates(restoredContent);
+                    setNotes((oldNotes) => {
+                        const newNotes = [...oldNotes];
+                        const currentNote = newNotes[currentPage];
+                        const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
+                        const isEmptyNote = currentNote.content.trim() === "";
+                        const newNote = {
+                            title: result.currentContext,
+                            content: uniqueContent,
+                            diagrams: [],
+                        };
+
+                        if (isDefaultTitle && isEmptyNote) {
+                            newNotes[currentPage] = newNote;
+                        } else {
+                            const noteIndex = newNotes.findIndex(
+                                (note) => note.title === newNote.title
+                            );
+
+                            if (noteIndex !== -1) {
+                                newNotes[noteIndex] = newNote;
+                                setCurrentPage(noteIndex);
+                            } else if (!result.createNewContext) {
+                                newNotes[currentPage] = newNote;
+                            } else {
+                                newNotes.push(newNote);
+                                setCurrentPage(newNotes.length - 1);
+                            }
+                        }
+
+                        // Save notes to local storage after updating
+                        saveNotesToLocalStorage(newNotes);
+
+                        return newNotes;
+                    });
+                    setCurrentPageTitle(result.currentContext);
+                    setPendingContent("");
                 }
-                
-                // Save notes to local storage after updating
-                saveNotesToLocalStorage(newNotes);
-                
-                return newNotes;
-              });
-              setCurrentPageTitle(result.currentContext);
-              setPendingContent("");
-            }
-            setTimeout(() => setSummarizeStatus(""), 3000);
-          });
+                setTimeout(() => setSummarizeStatus(""), 3000);
+            });
         },
         [notes, currentPage, currentPageTitle]
-      );
+    );
 
     useEffect(() => {
         const storedNotes = localStorage.getItem('notesifyNotes');
         if (storedNotes) {
-          try {
-            const parsedNotes = JSON.parse(storedNotes);
-            if (parsedNotes.length > 0) {
-              setNotes(parsedNotes);
-              setCurrentPage(0);
+            try {
+                const parsedNotes = JSON.parse(storedNotes);
+                if (parsedNotes.length > 0) {
+                    setNotes(parsedNotes);
+                    setCurrentPage(0);
+                }
+            } catch (error) {
+                console.error('Error parsing stored notes:', error);
             }
-          } catch (error) {
-            console.error('Error parsing stored notes:', error);
-          }
         }
-    }, []);  
+    }, []);
 
     // Update the handleManualInput function
     const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -649,10 +647,10 @@ export default function Component() {
         if (notes.length > 1) {
             const updatedNotes = notes.filter((_, index) => index !== indexToRemove);
             setNotes(updatedNotes);
-            
+
             // Update localStorage
             localStorage.setItem('notesifyNotes', JSON.stringify(updatedNotes));
-            
+
             if (currentPage >= indexToRemove && currentPage > 0) {
                 setCurrentPage(currentPage - 1);
             }
@@ -818,8 +816,7 @@ export default function Component() {
         <div className={`${appSettings.theme === "dark" ? "dark" : ""}`}>
             <div className="max-h-[calc(100vh-28px)] bg-gray-50 dark:bg-gray-900 flex flex-col w-full">
                 <header className="bg-white dark:bg-gray-800 shadow-sm">
-                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white"><a href="/" className="nav-link">Notesify</a></h1>
+                    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-center items-center"> {/* Changed `justify-between` to `justify-center` */}
                         <div className="flex items-center space-x-4">
                             <Button
                                 onClick={toggleRecording}
@@ -867,12 +864,17 @@ export default function Component() {
                         </div>
                     </div>
                 </header>
+
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
                     {/* Sidebar */}
                     <aside
                         className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                             } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
+                        {/* Add the "Notesify" title here */}
+                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white p-4">
+                            <a href="/" className="nav-link">Notesify</a>
+                        </h1>
                         <nav className="flex flex-col p-4 space-y-8">
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
                                 Settings
@@ -924,11 +926,11 @@ export default function Component() {
                                                 setCurrentPageTitle(note.title);
                                             }}
                                             className={`
-                                                ${currentPage === index
+                                ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
                                                 } transition-colors duration-200 pr-8
-                                            `}
+                            `}
                                         >
                                             {note.title}
                                         </Button>
