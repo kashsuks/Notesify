@@ -949,7 +949,7 @@ export default function Component() {
                                             value={currentPageTitle}
                                             onChange={(e) => setCurrentPageTitle(e.target.value)}
                                             onBlur={() => updatePageTitle(index)}
-                                            onKeyPress={(e) => {
+                                            onKeyUp={(e) => {
                                                 if (e.key === "Enter") {
                                                     updatePageTitle(index);
                                                 }
