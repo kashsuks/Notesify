@@ -189,7 +189,15 @@ export default function Component() {
     const [generatedOutput, setGeneratedOutput] = useState(null);
     const [isOverlayVisible, setOverlayVisible] = useState(false);
 
-
+    const saveNotesToLocalStorage = (notes: Note[]) => {
+        const serializedNotes = notes.map(note => ({
+          ...note,
+          id: crypto.randomUUID(), // Generate a unique ID for each note
+          lastModified: new Date().toISOString()
+        }));
+        
+        localStorage.setItem('notesifyNotes', JSON.stringify(serializedNotes));
+    };
 
 
     // Handle keyboard shortcut for math mode
@@ -268,59 +276,78 @@ export default function Component() {
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
         (content: string) => {
-            const { protectedContent, latexBlocks } = protectLaTeX(content);
-            setIsSummarizing(true);
-            const titles = notes.map((note) => note.title);
-            summarizeNote(
-                notes[currentPage].content,
-                protectedContent,
-                currentPageTitle,
-                titles,
-                notes
-            ).then((result) => {
-                setIsSummarizing(false);
-                setSummarizeStatus(result.message);
-                if (result.success) {
-                    const restoredContent = restoreLaTeX(result.summary, latexBlocks);
-                    const uniqueContent = removeDuplicates(restoredContent);
-                    setNotes((oldNotes) => {
-                        const newNotes = [...oldNotes];
-                        const currentNote = newNotes[currentPage];
-                        const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
-                        const isEmptyNote = currentNote.content.trim() === "";
-                        const newNote = {
-                            title: result.currentContext,
-                            content: uniqueContent,
-                            diagrams: [],
-                        };
-
-                        if (isDefaultTitle && isEmptyNote) {
-                            newNotes[currentPage] = newNote;
-                        } else {
-                            const noteIndex = newNotes.findIndex(
-                                (note) => note.title === newNote.title
-                            );
-
-                            if (noteIndex !== -1) {
-                                newNotes[noteIndex] = newNote;
-                                setCurrentPage(noteIndex);
-                            } else if (!result.createNewContext) {
-                                newNotes[currentPage] = newNote;
-                            } else {
-                                newNotes.push(newNote);
-                                setCurrentPage(newNotes.length - 1);
-                            }
-                        }
-                        return newNotes;
-                    });
-                    setCurrentPageTitle(result.currentContext);
-                    setPendingContent("");
+          const { protectedContent, latexBlocks } = protectLaTeX(content);
+          setIsSummarizing(true);
+          const titles = notes.map((note) => note.title);
+          summarizeNote(
+            notes[currentPage].content,
+            protectedContent,
+            currentPageTitle,
+            titles,
+            notes
+          ).then((result) => {
+            setIsSummarizing(false);
+            setSummarizeStatus(result.message);
+            if (result.success) {
+              const restoredContent = restoreLaTeX(result.summary, latexBlocks);
+              const uniqueContent = removeDuplicates(restoredContent);
+              setNotes((oldNotes) => {
+                const newNotes = [...oldNotes];
+                const currentNote = newNotes[currentPage];
+                const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
+                const isEmptyNote = currentNote.content.trim() === "";
+                const newNote = {
+                  title: result.currentContext,
+                  content: uniqueContent,
+                  diagrams: [],
+                };
+      
+                if (isDefaultTitle && isEmptyNote) {
+                  newNotes[currentPage] = newNote;
+                } else {
+                  const noteIndex = newNotes.findIndex(
+                    (note) => note.title === newNote.title
+                  );
+      
+                  if (noteIndex !== -1) {
+                    newNotes[noteIndex] = newNote;
+                    setCurrentPage(noteIndex);
+                  } else if (!result.createNewContext) {
+                    newNotes[currentPage] = newNote;
+                  } else {
+                    newNotes.push(newNote);
+                    setCurrentPage(newNotes.length - 1);
+                  }
                 }
-                setTimeout(() => setSummarizeStatus(""), 3000);
-            });
+                
+                // Save notes to local storage after updating
+                saveNotesToLocalStorage(newNotes);
+                
+                return newNotes;
+              });
+              setCurrentPageTitle(result.currentContext);
+              setPendingContent("");
+            }
+            setTimeout(() => setSummarizeStatus(""), 3000);
+          });
         },
         [notes, currentPage, currentPageTitle]
-    );
+      );
+
+    useEffect(() => {
+        const storedNotes = localStorage.getItem('notesifyNotes');
+        if (storedNotes) {
+          try {
+            const parsedNotes = JSON.parse(storedNotes);
+            if (parsedNotes.length > 0) {
+              setNotes(parsedNotes);
+              setCurrentPage(0);
+            }
+          } catch (error) {
+            console.error('Error parsing stored notes:', error);
+          }
+        }
+    }, []);  
 
     // Update the handleManualInput function
     const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
