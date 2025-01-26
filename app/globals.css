@@ -118,3 +118,21 @@ body {
   width: 100%;
   padding: .55rem 1.5rem;
 }
+
+.login-button-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+}
+
+.login-button {
+  background-color: #007bff;
+  color: white;
+  padding: 10px 20px;
+  border-radius: 5px;
+  text-decoration: none;
+}
+
+.login-button:hover {
+  background-color: #0056b3;
+}

@@ -730,20 +730,20 @@ export default function Component() {
             <div className="max-h-[calc(100vh-28px)] bg-gray-50 dark:bg-gray-900 flex flex-col w-full">
                 <header className="bg-white dark:bg-gray-800 shadow-sm">
                     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white">Notesify</h1>
+                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white"><a href="/" className="nav-link">Notesify</a></h1>
                         <div className="flex items-center space-x-4">
                             <Button
                                 onClick={toggleRecording}
                                 className={isCycling ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"}
                             >
                                 {isCycling ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
-                                {isCycling ? "Stop Recording" : "Start Recording"}
+                                {isCycling ? "" : ""}
                             </Button>
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
                                 className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
                             >
-                                {isMathMode ? "Exit Math Mode" : "Enter Math Mode"}
+                                {isMathMode ? "Exit f(x)" : "f(x)"}
                             </Button>
                             <Button
                                 onClick={saveSelectedText}
