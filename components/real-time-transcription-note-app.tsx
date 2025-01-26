@@ -15,6 +15,10 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Menu } from "lucide-react";
 import QuizModal from "@/components/QuizModal";
+import { GumloopClient } from "gumloop";
+import OutputOverlay from "@/components/OutputOverlay"; // Import OutputOverlay
+
+
 
 
 const DEBOUNCE_DELAY = 4000;
@@ -182,7 +186,9 @@ export default function Component() {
     const mathInputRef = useRef<HTMLTextAreaElement>(null);
 
     const [notesBoxKey, setNotesBoxKey] = useState(0);
-    const [generatedOutput, setGeneratedOutput] = useState<string | null>(null);
+    const [generatedOutput, setGeneratedOutput] = useState(null);
+    const [isOverlayVisible, setOverlayVisible] = useState(false);
+
 
 
 
@@ -510,44 +516,41 @@ export default function Component() {
         setIsQuizModalOpen(false);
     };
 
-    const handleSaveQuiz = (settings: typeof quizSettings) => {
-        const options = {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${process.env.GUMLOOP_API_KEY}`,
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-                user_id: "hN5cnq9HEnaSxYyFwCrS9h8fRvN2",
-                saved_item_id: "9y5oSctDArBsbQmK1UCXii",
-                pipeline_inputs: [
-                    { name: "topic", value: settings.topic },
-                    { name: "quizType", value: settings.quizType },
-                    { name: "audience", value: settings.audience },
-                    { name: "difficultyLevel", value: settings.difficultyLevel },
-                    { name: "numQuestions", value: settings.numQuestions.toString() },
-                    { name: "answerKey", value: settings.answerKey },
-                    { name: "additionalNotes", value: settings.additionalNotes },
-                ],
-            }),
-        };
+    // Initialize the client
+    const client = new GumloopClient({
+        apiKey: "a04de40bc6b64797b52e24d213470f2e", // Replace with your API key
+        userId: "hN5cnq9HEnaSxYyFwCrS9h8fRvN2",  // Replace with your user ID
+    });
 
-        fetch("https://api.gumloop.com/api/v1/start_pipeline", options)
-            .then((response) => response.json())
-            .then((response) => {
-                console.log("Full response:", response); // Log full response for debugging
-                setGeneratedOutput(response.result || "No output generated."); // Assuming the response has a `result` field
+    // Run a flow and wait for outputs
+    async function runFlow(settings: typeof quizSettings) {
+        try {
+            // Prepare the input parameters for the flow
+            const inputs = {
+                topic: settings.topic,
+                quizType: settings.quizType,
+                audience: settings.audience,
+                difficultyLevel: settings.difficultyLevel,
+                numQuestions: settings.numQuestions.toString(),
+                answerKey: settings.answerKey,
+                additionalNotes: settings.additionalNotes,
+            };
 
-                alert("Response from Gumloops: " + JSON.stringify(response));
-                setQuizSettings(settings);
-                closeQuizModal(); // Close the modal after successful submission
-            })
-            .catch((err) => {
-                console.error("Error:", err);
-                alert("Failed to create quiz.");
-            });
+            // Execute the flow
+            const output = await client.runFlow("9y5oSctDArBsbQmK1UCXii", inputs); // Replace with your actual flow ID
 
-    };
+            // Handle the response
+            console.log("Flow Output:", output); // Log the output for debugging
+            setGeneratedOutput(output['Quiz Link'] || "No output generated.");
+            setOverlayVisible(true); // Show the overlay with the output
+
+            // Optionally, close the modal after successful submission
+            closeQuizModal();
+        } catch (error) {
+            console.error("Flow execution failed:", error);
+            alert("Failed to create quiz.");
+        }
+    }
     // Handle math input changes
     const handleMathInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setMathInput(e.target.value);
@@ -732,13 +735,6 @@ export default function Component() {
         setEditMode(false);
     };
 
-    /*/const handleTextSelection = useCallback(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-          setSelectedText(selection.toString());
-        }
-      }, []); /*/
-
 
     const saveSelectedText = () => {
         const selection = window.getSelection();
@@ -749,13 +745,6 @@ export default function Component() {
         }
     };
 
-    /*/
-    useEffect(() => {
-        document.addEventListener("mouseup", handleTextSelection);
-        return () => {
-            document.removeEventListener("mouseup", handleTextSelection);
-        };
-    }, [handleTextSelection]); /*/
 
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -787,6 +776,10 @@ export default function Component() {
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
+    };
+
+    const closeOverlay = () => {
+        setOverlayVisible(false);
     };
 
     return (
@@ -1015,15 +1008,10 @@ export default function Component() {
                     <QuizModal
                         isOpen={isQuizModalOpen}
                         onClose={() => setIsQuizModalOpen(false)}
-                        onRun={handleSaveQuiz}
+                        onRun={runFlow}
                     />
                 )}
-                {generatedOutput && (
-                    <div className="mt-6">
-                        <h2 className="text-lg font-bold">Generated Output:</h2>
-                        <pre className="p-4 bg-gray-100 rounded-lg border">{generatedOutput}</pre>
-                    </div>
-                )}
+                {isOverlayVisible && <OutputOverlay output={generatedOutput} onClose={closeOverlay} />}
             </div>
         </div>
     )
