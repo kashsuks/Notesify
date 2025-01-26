@@ -886,7 +886,7 @@ export default function Component() {
                                 Create Quiz
                             </Button>
                             <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
-                                Flashcard
+                                Flashcard [WIP]
                             </Button>
                         </nav>
                     </aside>
