@@ -168,6 +168,8 @@ export default function Component() {
     const [mathError, setMathError] = useState("");
     const mathInputRef = useRef<HTMLTextAreaElement>(null);
 
+    const [notesBoxKey, setNotesBoxKey] = useState(0);
+
     // Handle keyboard shortcut for math mode
     useEffect(() => {
         const handleKeyDown = (event: KeyboardEvent) => {
@@ -358,7 +360,6 @@ export default function Component() {
         }
     };
 
-    // Render LaTeX in Markdown
     const renderLaTeX = useCallback((text: string) => {
         try {
             const inlineRegex = /\$(.*?)\$/g;
@@ -367,31 +368,42 @@ export default function Component() {
                 .split(blockRegex)
                 .map((part, index) => {
                     if (index % 2 === 1) {
-                        return katex.renderToString(part, {
-                            throwOnError: false,
-                            displayMode: true,
-                        });
+                        return (
+                            <div
+                                key={index}
+                                dangerouslySetInnerHTML={{
+                                    __html: katex.renderToString(part, {
+                                        throwOnError: false,
+                                        displayMode: true,
+                                    }),
+                                }}
+                            />
+                        );
                     }
                     return part
                         .split(inlineRegex)
                         .map((subPart, subIndex) => {
                             if (subIndex % 2 === 1) {
-                                return katex.renderToString(subPart, {
-                                    throwOnError: false,
-                                });
+                                return (
+                                    <span
+                                        key={`${index}-${subIndex}`}
+                                        dangerouslySetInnerHTML={{
+                                            __html: katex.renderToString(subPart, {
+                                                throwOnError: false,
+                                            }),
+                                        }}
+                                    />
+                                );
                             }
                             return subPart;
-                        })
-                        .join('');
-                })
-                .join('');
+                        });
+                });
         } catch (error) {
             setMathError("Invalid LaTeX input");
             return text;
         }
     }, []);
 
-    // Render Markdown with LaTeX support
     const renderMarkdown = useMemo(() => {
         return (content: string) => {
             return (
@@ -423,7 +435,9 @@ export default function Component() {
                 key={index} 
                 className="mb-2"
                 dangerouslySetInnerHTML={{ 
-                    __html: renderLaTeX(sentence) 
+                    __html: katex.renderToString(sentence, {
+                        throwOnError: false,
+                    }),
                 }}
             />
         ));
@@ -636,6 +650,13 @@ export default function Component() {
         });
     };
 
+
+    // Function to handle blur event on the notes box
+    const handleNotesBoxBlur = () => {
+        // Increment the key to force a re-render
+        setNotesBoxKey((prevKey) => prevKey + 1);
+    };
+
     // Handle view click
     const handleViewClick = () => {
         setEditMode(true);
@@ -747,7 +768,7 @@ export default function Component() {
                             isSidebarOpen ? "translate-x-0" : "-translate-x-full"
                         } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
-                        <nav className="flex flex-col p-4 space-y-8"> {/* Increased spacing to space-y-8 */}
+                        <nav className="flex flex-col p-4 space-y-8">
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
                                 Settings
                             </Button>
@@ -762,7 +783,7 @@ export default function Component() {
                             </Button>
                         </nav>
                     </aside>
-
+    
                     {/* Notes Section */}
                     <div
                         className={`flex-grow transition-all duration-300 ease-in-out ${
@@ -799,11 +820,11 @@ export default function Component() {
                                                 setCurrentPageTitle(note.title);
                                             }}
                                             className={`
-                        ${currentPage === index
+                                                ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
                                                 } transition-colors duration-200 pr-8
-                      `}
+                                            `}
                                         >
                                             {note.title}
                                         </Button>
@@ -835,7 +856,9 @@ export default function Component() {
                                     />
                                 ) : (
                                     <div
+                                        key={notesBoxKey} // Force re-render when key changes
                                         onClick={handleViewClick}
+                                        onBlur={handleNotesBoxBlur} // Handle blur event
                                         className="w-full h-full bg-white border-2 text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out overflow-y-auto cursor-text dark:bg-gray-700 dark:text-white"
                                     >
                                         {renderMarkdown(notes[currentPage]?.content || "Click to edit...")}
@@ -894,7 +917,7 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
-
+    
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}
@@ -911,5 +934,4 @@ export default function Component() {
                 )}
             </div>
         </div>
-    );
-}
+    )};
