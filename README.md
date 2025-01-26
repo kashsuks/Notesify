@@ -45,7 +45,7 @@ We built Notesify using a modern tech stack to ensure a smooth and responsive us
 ## What’s Next for Notesify
 - **Mobile Version**: Expanding Notesify to mobile devices for on-the-go note-taking.
 - **Collaboration Features**: Allowing users to share and collaborate on notes in real-time.
-- **More AI Integration**: 
+- **More AI Integration**: We're planning on incorporating more AI models for other features such as flashcard generation, essay grading, etc.
 - **Offline Mode**: Enabling users to access and edit their notes without an internet connection.
 
 ---
