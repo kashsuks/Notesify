@@ -701,13 +701,6 @@ export default function Component() {
                                 {isCycling ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
                                 {isCycling ? "Stop Recording" : "Start Recording"}
                             </Button>
-                            <Button onClick={exportNotes} className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700">
-                                {isExporting ? (
-                                    <Loader2 className="animate-spin h-5 w-5 text-white" />
-                                ) : (
-                                    "Export Notes"
-                                )}
-                            </Button>
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
                                 className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
