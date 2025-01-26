@@ -150,7 +150,7 @@ export default function Component() {
     const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
     
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
