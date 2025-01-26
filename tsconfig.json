@@ -22,7 +22,7 @@
       },
       "target": "es2015"
     },
-    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/testing/page.jsx"],
+    "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/testing/page.jsx", "components/NavBar.jsx"],
     "exclude": ["node_modules"]
   }
   

@@ -48,6 +48,7 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
     --background: 0 0% 3.9%;
     --foreground: 0 0% 98%;
@@ -88,6 +89,7 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }
@@ -95,18 +97,24 @@ body {
 
 /* Add this to your CSS file */
 @layer base {
-    * {
-      @apply border-border;
-    }
-    body {
-      @apply bg-background text-foreground;
-    }
+  * {
+    @apply border-border;
   }
-  
-  .sidebar {
-    transition: transform 0.3s ease-in-out;
+
+  body {
+    @apply bg-background text-foreground;
   }
-  
-  .sidebar-hidden {
-    transform: translateX(-100%);
-  }
+}
+
+.sidebar {
+  transition: transform 0.3s ease-in-out;
+}
+
+.sidebar-hidden {
+  transform: translateX(-100%);
+}
+
+.nav-item.dropdown .dropdown-item .navbar-item {
+  width: 100%;
+  padding: .55rem 1.5rem;
+}

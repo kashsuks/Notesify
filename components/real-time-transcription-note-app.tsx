@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react";
+import { useUser } from '@auth0/nextjs-auth0/client';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -471,47 +472,47 @@ export default function Component() {
 
     useEffect(() => {
         if (isCycling) {
-          startRecordingCycle();
+            startRecordingCycle();
         } else {
-          stopRecordingCycle();
+            stopRecordingCycle();
         }
-      }, [isCycling]);
+    }, [isCycling]);
 
     // Start recording audio
     const startRecording = async () => {
         try {
-          if (!streamRef.current) {
-            streamRef.current = await navigator.mediaDevices.getUserMedia({
-              audio: true,
-            });
-          }
-          const mediaRecorder = new MediaRecorder(streamRef.current);
-          mediaRecorderRef.current = mediaRecorder;
-          audioChunksRef.current = [];
-      
-          mediaRecorder.ondataavailable = (event) => {
-            if (event.data.size > 0) {
-              audioChunksRef.current.push(event.data);
+            if (!streamRef.current) {
+                streamRef.current = await navigator.mediaDevices.getUserMedia({
+                    audio: true,
+                });
             }
-          };
-      
-          mediaRecorder.onstop = async () => {
-            const audioBlob = new Blob(audioChunksRef.current, {
-              type: "audio/webm",
-            });
-            try {
-              const result = await transcribeAudioChunk(audioBlob, pendingContent);
-              handleTranscribedInput(result.text);
-            } catch (error) {
-              console.error("Transcription error:", error);
-            }
-          };
-      
-          mediaRecorder.start();
+            const mediaRecorder = new MediaRecorder(streamRef.current);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = async () => {
+                const audioBlob = new Blob(audioChunksRef.current, {
+                    type: "audio/webm",
+                });
+                try {
+                    const result = await transcribeAudioChunk(audioBlob, pendingContent);
+                    handleTranscribedInput(result.text);
+                } catch (error) {
+                    console.error("Transcription error:", error);
+                }
+            };
+
+            mediaRecorder.start();
         } catch (error) {
-          console.error("Error accessing microphone:", error);
+            console.error("Error accessing microphone:", error);
         }
-      };
+    };
 
     // Add a new page
     const addNewPage = () => {
@@ -647,17 +648,17 @@ export default function Component() {
           setSelectedText(selection.toString());
         }
       }, []); /*/
-    
-      
+
+
     const saveSelectedText = () => {
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) {
-          const selected = selection.toString();
-          setSelectedText(selected);
-          console.log("Selected Text:", selected);
+            const selected = selection.toString();
+            setSelectedText(selected);
+            console.log("Selected Text:", selected);
         }
     };
-      
+
     /*/
     useEffect(() => {
         document.addEventListener("mouseup", handleTextSelection);
