@@ -907,7 +907,7 @@ export default function Component() {
                     {/* Sidebar */}
                     <aside
                         className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                            } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
+                            } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"} pt-16`} // Added pt-16 here
                     >
                         {/* Add the "Notesify" title here */}
                         <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white p-4">
@@ -928,6 +928,13 @@ export default function Component() {
                             </Button>
                         </nav>
                     </aside>
+
+                    <Button
+                        onClick={toggleSidebar}
+                        className="bg-gray-500 hover:bg-gray-600 absolute top-6 left-4 z-10 p-2 transition-all duration-300 ease-in-out transform hover:scale-105" // Changed top-4 to top-6
+                    >
+                        <Menu className="h-6 w-6" />
+                    </Button>
 
                     {/* Notes Section */}
                     <div
