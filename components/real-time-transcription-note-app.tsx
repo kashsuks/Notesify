@@ -7,19 +7,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Loader2, Mic, MicOff, Plus, X, Image, Settings } from "lucide-react";
 import ReactMarkdown from "react-markdown";
-import DiagramGenerator from "@/components/diagram-generator";
 import mermaid from "mermaid";
-import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Menu } from "lucide-react";
 import QuizModal from "@/components/QuizModal";
 import { GumloopClient } from "gumloop";
-import OutputOverlay from "@/components/OutputOverlay"; // Import OutputOverlay
-
-
-
+import OutputOverlay from "@/components/OutputOverlay";
+import { InlineMath, BlockMath } from "react-katex"; // Import react-katex components
+import "katex/dist/katex.min.css"; // Import KaTeX CSS
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -132,6 +129,41 @@ const NoteEditor = React.memo(({ content, onChange }: { content: string; onChang
     );
 });
 
+const NotesBox = ({ content }: { content: string }) => {
+    const [isLaTeXRendered, setIsLaTeXRendered] = useState(false);
+
+    // Function to render LaTeX content
+    const renderLaTeXInContent = (content: string) => {
+        const parts = content.split(/(\$\$.*?\$\$|\$.*?\$)/g);
+        return parts.map((part, index) => {
+            if (part.startsWith("$$") && part.endsWith("$$")) {
+                return <BlockMath key={index}>{part.slice(2, -2)}</BlockMath>;
+            } else if (part.startsWith("$") && part.endsWith("$")) {
+                return <InlineMath key={index}>{part.slice(1, -1)}</InlineMath>;
+            } else {
+                return part;
+            }
+        });
+    };
+
+    return (
+        <div className="notes-box">
+            {/* LaTeX Button */}
+            <button
+                onClick={() => setIsLaTeXRendered(!isLaTeXRendered)}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded-md text-sm mb-2 transition-all duration-300 ease-in-out transform hover:scale-105"
+            >
+                {isLaTeXRendered ? "Hide LaTeX" : "Render LaTeX"}
+            </button>
+
+            {/* Content */}
+            <div className="w-full h-full bg-white border-2 text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out overflow-y-auto cursor-text dark:bg-gray-700 dark:text-white">
+                {isLaTeXRendered ? renderLaTeXInContent(content) : content}
+            </div>
+        </div>
+    );
+};
+
 export default function Component() {
     const [notes, setNotes] = useState<Note[]>([
         { title: "Untitled Note", content: "", diagrams: [] },
@@ -166,14 +198,13 @@ export default function Component() {
     const [selectedText, setSelectedText] = useState("");
     const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
-
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
     const cycleTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const streamRef = useRef<MediaStream | null>(null);
-    const newTabInputRef = useRef<HTMLInputElement>(null);
+    const newTabInputRef = useRef<HTMLInputElement | null>(null);
 
     const [pendingContent, setPendingContent] = useState("");
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -183,7 +214,7 @@ export default function Component() {
     const [isMathMode, setIsMathMode] = useState(false);
     const [mathInput, setMathInput] = useState("");
     const [mathError, setMathError] = useState("");
-    const mathInputRef = useRef<HTMLTextAreaElement>(null);
+    const mathInputRef = useRef<HTMLTextAreaElement | null>(null);
 
     const [notesBoxKey, setNotesBoxKey] = useState(0);
     const [generatedOutput, setGeneratedOutput] = useState(null);
@@ -191,14 +222,13 @@ export default function Component() {
 
     const saveNotesToLocalStorage = (notes: Note[]) => {
         const serializedNotes = notes.map(note => ({
-          ...note,
-          id: crypto.randomUUID(), // Generate a unique ID for each note
-          lastModified: new Date().toISOString()
+            ...note,
+            id: crypto.randomUUID(), // Generate a unique ID for each note
+            lastModified: new Date().toISOString()
         }));
-        
+
         localStorage.setItem('notesifyNotes', JSON.stringify(serializedNotes));
     };
-
 
     // Handle keyboard shortcut for math mode
     useEffect(() => {
@@ -276,88 +306,89 @@ export default function Component() {
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
         (content: string) => {
-          const { protectedContent, latexBlocks } = protectLaTeX(content);
-          setIsSummarizing(true);
-          const titles = notes.map((note) => note.title);
-          summarizeNote(
-            notes[currentPage].content,
-            protectedContent,
-            currentPageTitle,
-            titles,
-            notes
-          ).then((result) => {
-            setIsSummarizing(false);
-            setSummarizeStatus(result.message);
-            if (result.success) {
-              const restoredContent = restoreLaTeX(result.summary, latexBlocks);
-              const uniqueContent = removeDuplicates(restoredContent);
-              setNotes((oldNotes) => {
-                const newNotes = [...oldNotes];
-                const currentNote = newNotes[currentPage];
-                const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
-                const isEmptyNote = currentNote.content.trim() === "";
-                const newNote = {
-                  title: result.currentContext,
-                  content: uniqueContent,
-                  diagrams: [],
-                };
-      
-                if (isDefaultTitle && isEmptyNote) {
-                  newNotes[currentPage] = newNote;
-                } else {
-                  const noteIndex = newNotes.findIndex(
-                    (note) => note.title === newNote.title
-                  );
-      
-                  if (noteIndex !== -1) {
-                    newNotes[noteIndex] = newNote;
-                    setCurrentPage(noteIndex);
-                  } else if (!result.createNewContext) {
-                    newNotes[currentPage] = newNote;
-                  } else {
-                    newNotes.push(newNote);
-                    setCurrentPage(newNotes.length - 1);
-                  }
+            const { protectedContent, latexBlocks } = protectLaTeX(content);
+            setIsSummarizing(true);
+            const titles = notes.map((note) => note.title);
+            summarizeNote(
+                notes[currentPage].content,
+                protectedContent,
+                currentPageTitle,
+                titles,
+                notes
+            ).then((result) => {
+                setIsSummarizing(false);
+                setSummarizeStatus(result.message);
+                if (result.success) {
+                    const restoredContent = restoreLaTeX(result.summary, latexBlocks);
+                    const uniqueContent = removeDuplicates(restoredContent);
+                    setNotes((oldNotes) => {
+                        const newNotes = [...oldNotes];
+                        const currentNote = newNotes[currentPage];
+                        const isDefaultTitle = currentNote.title.startsWith("Untitled Note");
+                        const isEmptyNote = currentNote.content.trim() === "";
+                        const newNote = {
+                            title: result.currentContext,
+                            content: uniqueContent,
+                            diagrams: [],
+                        };
+
+                        if (isDefaultTitle && isEmptyNote) {
+                            newNotes[currentPage] = newNote;
+                        } else {
+                            const noteIndex = newNotes.findIndex(
+                                (note) => note.title === newNote.title
+                            );
+
+                            if (noteIndex !== -1) {
+                                newNotes[noteIndex] = newNote;
+                                setCurrentPage(noteIndex);
+                            } else if (!result.createNewContext) {
+                                newNotes[currentPage] = newNote;
+                            } else {
+                                newNotes.push(newNote);
+                                setCurrentPage(newNotes.length - 1);
+                            }
+                        }
+
+                        // Save notes to local storage after updating
+                        saveNotesToLocalStorage(newNotes);
+
+                        return newNotes;
+                    });
+                    setCurrentPageTitle(result.currentContext);
+                    setPendingContent("");
                 }
-                
-                // Save notes to local storage after updating
-                saveNotesToLocalStorage(newNotes);
-                
-                return newNotes;
-              });
-              setCurrentPageTitle(result.currentContext);
-              setPendingContent("");
-            }
-            setTimeout(() => setSummarizeStatus(""), 3000);
-          });
+                setTimeout(() => setSummarizeStatus(""), 3000);
+            });
         },
         [notes, currentPage, currentPageTitle]
-      );
+    );
 
     useEffect(() => {
         const storedNotes = localStorage.getItem('notesifyNotes');
         if (storedNotes) {
-          try {
-            const parsedNotes = JSON.parse(storedNotes);
-            if (parsedNotes.length > 0) {
-              setNotes(parsedNotes);
-              setCurrentPage(0);
+            try {
+                const parsedNotes = JSON.parse(storedNotes);
+                if (parsedNotes.length > 0) {
+                    setNotes(parsedNotes);
+                    setCurrentPage(0);
+                }
+            } catch (error) {
+                console.error('Error parsing stored notes:', error);
             }
-          } catch (error) {
-            console.error('Error parsing stored notes:', error);
-          }
         }
-    }, []);  
+    }, []);
 
     // Update the handleManualInput function
     const handleManualInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        const newContent = e.target.value;
+        // Replace '*' with a newline character
+        const newContent = e.target.value.replace(/\*/g, '\n');
         setPendingContent(newContent);
-
+    
         if (timerRef.current) {
             clearTimeout(timerRef.current);
         }
-
+    
         // Check if the input event is a paste event
         if (e.nativeEvent instanceof InputEvent && e.nativeEvent.inputType === 'insertFromPaste') {
             // Immediately summarize for paste events
@@ -532,7 +563,6 @@ export default function Component() {
         console.log("Settings saved:", appSettings);
     };
 
-
     // Open quiz modal
     const openQuizModal = () => {
         setIsQuizModalOpen(true);
@@ -578,6 +608,7 @@ export default function Component() {
             alert("Failed to create quiz.");
         }
     }
+
     // Handle math input changes
     const handleMathInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setMathInput(e.target.value);
@@ -649,10 +680,10 @@ export default function Component() {
         if (notes.length > 1) {
             const updatedNotes = notes.filter((_, index) => index !== indexToRemove);
             setNotes(updatedNotes);
-            
+
             // Update localStorage
             localStorage.setItem('notesifyNotes', JSON.stringify(updatedNotes));
-            
+
             if (currentPage >= indexToRemove && currentPage > 0) {
                 setCurrentPage(currentPage - 1);
             }
@@ -750,7 +781,6 @@ export default function Component() {
         });
     };
 
-
     // Function to handle blur event on the notes box
     const handleNotesBoxBlur = () => {
         // Increment the key to force a re-render
@@ -767,7 +797,6 @@ export default function Component() {
         setEditMode(false);
     };
 
-
     const saveSelectedText = () => {
         const selection = window.getSelection();
         if (selection && selection.toString().length > 0) {
@@ -776,7 +805,6 @@ export default function Component() {
             console.log("Selected Text:", selected);
         }
     };
-
 
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -819,31 +847,54 @@ export default function Component() {
             <div className="max-h-[calc(100vh-28px)] bg-gray-50 dark:bg-gray-900 flex flex-col w-full">
                 <header className="bg-white dark:bg-gray-800 shadow-sm">
                     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 flex justify-between items-center">
-                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white"><a href="/" className="nav-link">Notesify</a></h1>
+                        <h1 className="text-4xl font-[1000] text-gray-900 dark:text-white">
+                            <a href="/" className="nav-link">Notesify</a>
+                        </h1>
                         <div className="flex items-center space-x-4">
+                            {/* Recording Button */}
                             <Button
                                 onClick={toggleRecording}
-                                className={isCycling ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"}
+                                className={`${isCycling ? "bg-red-500 hover:bg-red-600" : "bg-blue-500 hover:bg-blue-600 dark:bg-blue-600 dark:hover:bg-blue-700"} px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105`}
                             >
                                 {isCycling ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
-                                {isCycling ? "" : ""}
                             </Button>
+
+                            {/* Math Mode Button */}
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
-                                className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
+                                className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105"
                             >
                                 {isMathMode ? "Exit f(x)" : "f(x)"}
                             </Button>
-                            <Button
-                                onClick={saveSelectedText}
-                                className="bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700"
-                            >
-                                Save Selected Text
-                            </Button>
+
+                            {/* Save Selected Text Button and Selected Text Box */}
+                            <div className="flex items-center space-x-2">
+                                <Button
+                                    onClick={saveSelectedText}
+                                    className="bg-yellow-500 hover:bg-yellow-600 dark:bg-yellow-600 dark:hover:bg-yellow-700 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105"
+                                >
+                                    Save Selected Text
+                                </Button>
+                                <div className="p-2 border rounded bg-gray-100 dark:bg-gray-800 w-80 max-h-48 overflow-y-auto transition-all duration-300 ease-in-out hover:shadow-lg">
+                                    <strong>Selected Text:</strong>
+                                    <p>{selectedText}</p>
+                                    {mathSolution.length > 0 && (
+                                        <>
+                                            <strong>Solution:</strong>
+                                            {renderSolution(mathSolution)}
+                                        </>
+                                    )}
+                                    {error && (
+                                        <p className="text-red-500">{error}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Solve Equation Button */}
                             <Button
                                 onClick={solveSelectedEquation}
                                 disabled={isSolving || selectedText.trim() === ""}
-                                className="bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700"
+                                className="bg-indigo-500 hover:bg-indigo-600 dark:bg-indigo-600 dark:hover:bg-indigo-700 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105"
                             >
                                 {isSolving ? (
                                     <Loader2 className="animate-spin h-5 w-5 text-white" />
@@ -851,19 +902,6 @@ export default function Component() {
                                     "Solve Equation"
                                 )}
                             </Button>
-                            <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
-                                <strong>Selected Text:</strong>
-                                <p>{selectedText}</p>
-                                {mathSolution.length > 0 && (
-                                    <>
-                                        <strong>Solution:</strong>
-                                        {renderSolution(mathSolution)}
-                                    </>
-                                )}
-                                {error && (
-                                    <p className="text-red-500">{error}</p>
-                                )}
-                            </div>
                         </div>
                     </div>
                 </header>
@@ -874,16 +912,16 @@ export default function Component() {
                             } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
                         <nav className="flex flex-col p-4 space-y-8">
-                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
+                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                 Settings
                             </Button>
-                            <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
+                            <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                 Notes
                             </Button>
-                            <Button onClick={openQuizModal} className="bg-green-500 hover:bg-green-600">
+                            <Button onClick={openQuizModal} className="bg-green-500 hover:bg-green-600 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                 Create Quiz
                             </Button>
-                            <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
+                            <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                 Flashcard
                             </Button>
                         </nav>
@@ -896,7 +934,7 @@ export default function Component() {
                     >
                         <Button
                             onClick={toggleSidebar}
-                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2"
+                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2 transition-all duration-300 ease-in-out transform hover:scale-105"
                         >
                             <Menu className="h-6 w-6" />
                         </Button>
@@ -927,7 +965,7 @@ export default function Component() {
                                                 ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
-                                                } transition-colors duration-200 pr-8
+                                                } transition-colors duration-200 pr-8 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105
                                             `}
                                         >
                                             {note.title}
@@ -945,7 +983,7 @@ export default function Component() {
                             ))}
                             <button
                                 onClick={addNewPage}
-                                className="inline-flex justify-center items-center px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 size-10 dark:bg-gray-700 dark:text-white"
+                                className="inline-flex justify-center items-center px-3 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 size-10 dark:bg-gray-700 dark:text-white transition-all duration-300 ease-in-out transform hover:scale-105"
                                 aria-label="Add new note"
                             >
                                 <Plus className="size-6" />
@@ -959,14 +997,7 @@ export default function Component() {
                                         onChange={handleNoteEdit}
                                     />
                                 ) : (
-                                    <div
-                                        key={notesBoxKey} // Force re-render when key changes
-                                        onClick={handleViewClick}
-                                        onBlur={handleNotesBoxBlur} // Handle blur event
-                                        className="w-full h-full bg-white border-2 text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out overflow-y-auto cursor-text dark:bg-gray-700 dark:text-white"
-                                    >
-                                        {renderMarkdown(notes[currentPage]?.content || "Click to edit...")}
-                                    </div>
+                                    <NotesBox content={notes[currentPage]?.content || "Click to edit..."} />
                                 )}
                             </div>
                             {isMathMode && (
@@ -979,10 +1010,10 @@ export default function Component() {
                                         className="w-full h-20 text-lg p-2 rounded-lg shadow-inner bg-blue-100 focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out resize-none dark:bg-gray-700 dark:text-white"
                                         aria-label="Math Equation Input"
                                     />
-                                    <Button onClick={insertMathEquation} className="mt-2">
+                                    <Button onClick={insertMathEquation} className="mt-2 px-4 py-2 transition-all duration-300 ease-in-out transform hover:scale-105">
                                         Insert Equation
                                     </Button>
-                                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded">
+                                    <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-800 rounded transition-all duration-300 ease-in-out hover:shadow-lg">
                                         <strong>Preview:</strong>
                                         <div
                                             dangerouslySetInnerHTML={{
@@ -1046,5 +1077,5 @@ export default function Component() {
                 {isOverlayVisible && <OutputOverlay output={generatedOutput} onClose={closeOverlay} />}
             </div>
         </div>
-    )
-};
+    );
+}
