@@ -13,6 +13,7 @@ import DiagramModal from '@/components/diagram-modal';
 import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
+import { Menu } from "lucide-react";
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -147,9 +148,10 @@ export default function Component() {
     const [isExporting, setIsExporting] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedText, setSelectedText] = useState("");
-    const [mathSolution, setMathSolution] = useState("");
+    const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
@@ -166,6 +168,8 @@ export default function Component() {
     const [mathInput, setMathInput] = useState("");
     const [mathError, setMathError] = useState("");
     const mathInputRef = useRef<HTMLTextAreaElement>(null);
+
+    const [notesBoxKey, setNotesBoxKey] = useState(0);
 
     // Handle keyboard shortcut for math mode
     useEffect(() => {
@@ -225,8 +229,13 @@ export default function Component() {
         try {
             // Call the Groq API to solve the LaTeX equation
             const solution = await solveWithGroq(selectedText);
-            setMathSolution(solution); // Set the step-by-step solution
-            console.log("Step-by-step solution:", solution);
+            
+            // Split the solution into sentences
+            const sentences: string[] = solution.split('. ').map((sentence: string) => sentence.trim() + '.');
+            
+            // Set the step-by-step solution as an array of sentences
+            setMathSolution(sentences);
+            console.log("Step-by-step solution:", sentences);
         } catch (error) {
             console.error("Error solving equation:", error);
             setError("Failed to solve the equation.");
@@ -234,7 +243,6 @@ export default function Component() {
             setIsSolving(false);
         }
     };
-
 
     // Summarize content with LaTeX protection
     const summarizeContent = useCallback(
@@ -314,7 +322,6 @@ export default function Component() {
         }
     };
 
-
     // Handle changes in the pending content for transcribed audio
     const handleTranscribedInput = (newContent: string) => {
         setPendingContent((prevContent) => prevContent + " " + newContent);
@@ -354,7 +361,6 @@ export default function Component() {
         }
     };
 
-    // Render LaTeX in Markdown
     const renderLaTeX = useCallback((text: string) => {
         try {
             const inlineRegex = /\$(.*?)\$/g;
@@ -399,7 +405,6 @@ export default function Component() {
         }
     }, []);
 
-    // Render Markdown with LaTeX support
     const renderMarkdown = useMemo(() => {
         return (content: string) => {
             return (
@@ -424,6 +429,20 @@ export default function Component() {
             );
         };
     }, [renderLaTeX]);
+
+    const renderSolution = (solution: string[]) => {
+        return solution.map((sentence, index) => (
+            <div 
+                key={index} 
+                className="mb-2"
+                dangerouslySetInnerHTML={{ 
+                    __html: katex.renderToString(sentence, {
+                        throwOnError: false,
+                    }),
+                }}
+            />
+        ));
+    };
 
     // Export notes
     const exportNotes = async () => {
@@ -632,6 +651,13 @@ export default function Component() {
         });
     };
 
+
+    // Function to handle blur event on the notes box
+    const handleNotesBoxBlur = () => {
+        // Increment the key to force a re-render
+        setNotesBoxKey((prevKey) => prevKey + 1);
+    };
+
     // Handle view click
     const handleViewClick = () => {
         setEditMode(true);
@@ -713,13 +739,6 @@ export default function Component() {
                                 {isCycling ? <MicOff className="mr-2" /> : <Mic className="mr-2" />}
                                 {isCycling ? "Stop Recording" : "Start Recording"}
                             </Button>
-                            <Button onClick={exportNotes} className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700">
-                                {isExporting ? (
-                                    <Loader2 className="animate-spin h-5 w-5 text-white" />
-                                ) : (
-                                    "Export Notes"
-                                )}
-                            </Button>
                             <Button
                                 onClick={() => setIsMathMode((prev) => !prev)}
                                 className="bg-green-500 hover:bg-green-600 dark:bg-green-600 dark:hover:bg-green-700"
@@ -746,10 +765,10 @@ export default function Component() {
                             <div className="mt-4 p-2 border rounded bg-gray-100 dark:bg-gray-800">
                                 <strong>Selected Text:</strong>
                                 <p>{selectedText}</p>
-                                {mathSolution && (
+                                {mathSolution.length > 0 && (
                                     <>
                                         <strong>Solution:</strong>
-                                        <p>{mathSolution}</p>
+                                        {renderSolution(mathSolution)}
                                     </>
                                 )}
                                 {error && (
@@ -760,28 +779,40 @@ export default function Component() {
                     </div>
                 </header>
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
-                    <div className="w-full h-full flex flex-col">
+                    {/* Sidebar */}
+                    <aside
+                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${
+                            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                        } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
+                    >
+                        <nav className="flex flex-col p-4 space-y-8">
+                            <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
+                                Settings
+                            </Button>
+                            <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
+                                Notes
+                            </Button>
+                            <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
+                                Quiz
+                            </Button>
+                            <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
+                                Flashcard
+                            </Button>
+                        </nav>
+                    </aside>
+    
+                    {/* Notes Section */}
+                    <div
+                        className={`flex-grow transition-all duration-300 ease-in-out ${
+                            isSidebarOpen ? "ml-64" : "ml-0"
+                        }`}
+                    >
                         <Button
                             onClick={toggleSidebar}
-                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2">
-                            {isSidebarOpen ? "Hide Sidebar" : "Show Sidebar"}
+                            className="bg-gray-500 hover:bg-gray-600 absolute top-4 left-4 z-10 p-2"
+                        >
+                            <Menu className="h-6 w-6" />
                         </Button>
-                        <aside className={`w-64 bg-gray-800 text-white flex-shrink-0 sidebar ${isSidebarOpen ? '' : 'sidebar-hidden'}`}>
-                            <nav className="flex flex-col p-4 space-y-4">
-                                <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
-                                    Settings
-                                </Button>
-                                <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
-                                    Notes
-                                </Button>
-                                <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
-                                    Quiz
-                                </Button>
-                                <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
-                                    Flashcard
-                                </Button>
-                            </nav>
-                        </aside>
                         <div className="flex items-center space-x-2 overflow-x-auto mb-4 pr-32 relative">
                             {notes.map((note, index) => (
                                 <div key={index} className="flex-shrink-0 relative group">
@@ -806,11 +837,11 @@ export default function Component() {
                                                 setCurrentPageTitle(note.title);
                                             }}
                                             className={`
-                        ${currentPage === index
+                                                ${currentPage === index
                                                     ? "bg-blue-500 text-white hover:bg-blue-500"
                                                     : "bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-white"
                                                 } transition-colors duration-200 pr-8
-                      `}
+                                            `}
                                         >
                                             {note.title}
                                         </Button>
@@ -842,7 +873,9 @@ export default function Component() {
                                     />
                                 ) : (
                                     <div
+                                        key={notesBoxKey} // Force re-render when key changes
                                         onClick={handleViewClick}
+                                        onBlur={handleNotesBoxBlur} // Handle blur event
                                         className="w-full h-full bg-white border-2 text-lg p-4 rounded-md shadow-inner focus:ring-2 focus:ring-blue-300 transition-all duration-300 ease-in-out overflow-y-auto cursor-text dark:bg-gray-700 dark:text-white"
                                     >
                                         {renderMarkdown(notes[currentPage]?.content || "Click to edit...")}
@@ -901,7 +934,7 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
-
+    
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}
@@ -918,5 +951,4 @@ export default function Component() {
                 )}
             </div>
         </div>
-    );
-}
+    )};
