@@ -13,10 +13,10 @@ We understand the struggle of juggling multiple websites just to study for a sin
 
 ## How We Built It
 We built Notesify using a modern tech stack to ensure a smooth and responsive user experience. The app leverages:
-- **Frontend**: Next.js for a fast and dynamic user interface.
-- **Backend**: Node.js and Express for handling server-side logic.
-- **Database**: MongoDB for storing user data and notes securely.
-- **Authentication**: Custom-built authentication using bcrypt for password hashing and JWT for session management.
+- **Frontend**: Rect for a fast and dynamic user interface.
+- **Backend**: Next.js and Express for handling server-side logic.
+- **Database**: Local storage so that user's notes do not leave their device
+- **Authentication**: Auth0 for a secure login system
 - **Desktop Integration**: Electron.js to package the app for desktop use.
 
 ---
@@ -44,7 +44,7 @@ We built Notesify using a modern tech stack to ensure a smooth and responsive us
 
 ## What’s Next for Notesify
 - **Mobile Version**: Expanding Notesify to mobile devices for on-the-go note-taking.
-- **Collaboration Features**: Allowing users to share and collaborate on notes in real-time.
+- **Collaboration Features**: Allowing users to share and collaborate on notes in real time.
 - **More AI Integration**: We're planning on incorporating more AI models for other features such as flashcard generation, essay grading, etc.
 - **Offline Mode**: Enabling users to access and edit their notes without an internet connection.
 
