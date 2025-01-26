@@ -14,6 +14,12 @@ import SettingsModal from "@/components/SettingsModal";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import { Menu } from "lucide-react";
+import QuizModal from "@/components/QuizModal";
+import { GumloopClient } from "gumloop";
+import OutputOverlay from "@/components/OutputOverlay"; // Import OutputOverlay
+
+
+
 
 const DEBOUNCE_DELAY = 4000;
 const CYCLE_DURATION = 2000;
@@ -136,6 +142,16 @@ export default function Component() {
         font: "sans-serif",
         language: "en",
     });
+    const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
+    const [quizSettings, setQuizSettings] = useState({
+        topic: "",
+        quizType: "Multiple Choice",
+        audience: "",
+        difficultyLevel: "Hard",
+        numQuestions: 5,
+        answerKey: "No",
+        additionalNotes: "",
+    });
     const [showDiagrams] = useState(false);
     const [currentPage, setCurrentPage] = useState(0);
     const [currentPageTitle, setCurrentPageTitle] = useState("");
@@ -150,7 +166,7 @@ export default function Component() {
     const [selectedText, setSelectedText] = useState("");
     const [mathSolution, setMathSolution] = useState<string[]>([]);
     const [isSolving, setIsSolving] = useState(false);
-    
+
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -170,6 +186,11 @@ export default function Component() {
     const mathInputRef = useRef<HTMLTextAreaElement>(null);
 
     const [notesBoxKey, setNotesBoxKey] = useState(0);
+    const [generatedOutput, setGeneratedOutput] = useState(null);
+    const [isOverlayVisible, setOverlayVisible] = useState(false);
+
+
+
 
     // Handle keyboard shortcut for math mode
     useEffect(() => {
@@ -229,10 +250,10 @@ export default function Component() {
         try {
             // Call the Groq API to solve the LaTeX equation
             const solution = await solveWithGroq(selectedText);
-            
+
             // Split the solution into sentences
             const sentences: string[] = solution.split('. ').map((sentence: string) => sentence.trim() + '.');
-            
+
             // Set the step-by-step solution as an array of sentences
             setMathSolution(sentences);
             console.log("Step-by-step solution:", sentences);
@@ -432,10 +453,10 @@ export default function Component() {
 
     const renderSolution = (solution: string[]) => {
         return solution.map((sentence, index) => (
-            <div 
-                key={index} 
+            <div
+                key={index}
                 className="mb-2"
-                dangerouslySetInnerHTML={{ 
+                dangerouslySetInnerHTML={{
                     __html: katex.renderToString(sentence, {
                         throwOnError: false,
                     }),
@@ -479,11 +500,57 @@ export default function Component() {
     };
 
     // Save settings
-    const handleSaveSettings = (settings: { theme: string; font: string; language: string }) => {
-        setAppSettings(settings);
-        console.log("Settings saved:", settings);
+    const handleSaveSettings = (appSettings: { theme: string; font: string; language: string }) => {
+        setAppSettings(appSettings);
+        console.log("Settings saved:", appSettings);
     };
 
+
+    // Open quiz modal
+    const openQuizModal = () => {
+        setIsQuizModalOpen(true);
+    };
+
+    // Close quiz modal
+    const closeQuizModal = () => {
+        setIsQuizModalOpen(false);
+    };
+
+    // Initialize the client
+    const client = new GumloopClient({
+        apiKey: "a04de40bc6b64797b52e24d213470f2e", // Replace with your API key
+        userId: "hN5cnq9HEnaSxYyFwCrS9h8fRvN2",  // Replace with your user ID
+    });
+
+    // Run a flow and wait for outputs
+    async function runFlow(settings: typeof quizSettings) {
+        try {
+            // Prepare the input parameters for the flow
+            const inputs = {
+                topic: settings.topic,
+                quizType: settings.quizType,
+                audience: settings.audience,
+                difficultyLevel: settings.difficultyLevel,
+                numQuestions: settings.numQuestions.toString(),
+                answerKey: settings.answerKey,
+                additionalNotes: settings.additionalNotes,
+            };
+
+            // Execute the flow
+            const output = await client.runFlow("9y5oSctDArBsbQmK1UCXii", inputs); // Replace with your actual flow ID
+
+            // Handle the response
+            console.log("Flow Output:", output); // Log the output for debugging
+            setGeneratedOutput(output['Quiz Link'] || "No output generated.");
+            setOverlayVisible(true); // Show the overlay with the output
+
+            // Optionally, close the modal after successful submission
+            closeQuizModal();
+        } catch (error) {
+            console.error("Flow execution failed:", error);
+            alert("Failed to create quiz.");
+        }
+    }
     // Handle math input changes
     const handleMathInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         setMathInput(e.target.value);
@@ -668,13 +735,6 @@ export default function Component() {
         setEditMode(false);
     };
 
-    /*/const handleTextSelection = useCallback(() => {
-        const selection = window.getSelection();
-        if (selection && selection.toString().length > 0) {
-          setSelectedText(selection.toString());
-        }
-      }, []); /*/
-
 
     const saveSelectedText = () => {
         const selection = window.getSelection();
@@ -685,13 +745,6 @@ export default function Component() {
         }
     };
 
-    /*/
-    useEffect(() => {
-        document.addEventListener("mouseup", handleTextSelection);
-        return () => {
-            document.removeEventListener("mouseup", handleTextSelection);
-        };
-    }, [handleTextSelection]); /*/
 
     const escapeRegExp = (string: string) => {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -723,6 +776,10 @@ export default function Component() {
 
     const toggleSidebar = () => {
         setIsSidebarOpen((prev) => !prev);
+    };
+
+    const closeOverlay = () => {
+        setOverlayVisible(false);
     };
 
     return (
@@ -781,9 +838,8 @@ export default function Component() {
                 <main className="flex-grow flex p-4 w-full h-[calc(100vh-100px)]">
                     {/* Sidebar */}
                     <aside
-                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${
-                            isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-                        } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
+                        className={`fixed left-0 top-0 h-full w-64 bg-gray-800 text-white flex-shrink-0 transition-all duration-300 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+                            } ${appSettings.theme === "dark" ? "dark:bg-gray-800" : "bg-gray-800"}`}
                     >
                         <nav className="flex flex-col p-4 space-y-8">
                             <Button onClick={openSettings} className="bg-purple-500 hover:bg-purple-600">
@@ -792,20 +848,19 @@ export default function Component() {
                             <Button onClick={() => handleSetCurrentPage(0)} className="bg-blue-500 hover:bg-blue-600">
                                 Notes
                             </Button>
-                            <Button onClick={() => alert('Quiz section clicked')} className="bg-green-500 hover:bg-green-600">
-                                Quiz
+                            <Button onClick={openQuizModal} className="bg-green-500 hover:bg-green-600">
+                                Create Quiz
                             </Button>
                             <Button onClick={() => alert('Flashcard section clicked')} className="bg-yellow-500 hover:bg-yellow-600">
                                 Flashcard
                             </Button>
                         </nav>
                     </aside>
-    
+
                     {/* Notes Section */}
                     <div
-                        className={`flex-grow transition-all duration-300 ease-in-out ${
-                            isSidebarOpen ? "ml-64" : "ml-0"
-                        }`}
+                        className={`flex-grow transition-all duration-300 ease-in-out ${isSidebarOpen ? "ml-64" : "ml-0"
+                            }`}
                     >
                         <Button
                             onClick={toggleSidebar}
@@ -934,7 +989,7 @@ export default function Component() {
                                 </div>
                             </div>
                         </div>
-    
+
                         {error && (
                             <div className="mt-4 p-2 bg-red-100 dark:bg-red-900 border border-red-400 dark:border-red-700 text-red-700 dark:text-red-200 rounded">
                                 {error}
@@ -949,6 +1004,15 @@ export default function Component() {
                         onSave={handleSaveSettings}
                     />
                 )}
+                {isQuizModalOpen && (
+                    <QuizModal
+                        isOpen={isQuizModalOpen}
+                        onClose={() => setIsQuizModalOpen(false)}
+                        onRun={runFlow}
+                    />
+                )}
+                {isOverlayVisible && <OutputOverlay output={generatedOutput} onClose={closeOverlay} />}
             </div>
         </div>
-    )};
+    )
+};

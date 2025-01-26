@@ -1,58 +1,37 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  Collapse,
-  Container,
-  Navbar,
-  NavbarToggler,
-  NavbarBrand,
-  Nav,
-  NavItem,
-  UncontrolledDropdown,
-  DropdownToggle,
-  DropdownMenu,
-  DropdownItem
-} from 'reactstrap';
+import React from 'react';
 import { useUser } from '@auth0/nextjs-auth0/client';
 
-import PageLink from './PageLink';
-
 const NavBar = () => {
-  const { user, error, isLoading } = useUser();
-  const [isOpen, setIsOpen] = useState(false);
-
-  const toggle = () => setIsOpen(!isOpen);
+  const { user } = useUser();
 
   return (
-    <div>
-      <Navbar color="light" light expand="md">
-        <Container>
-          <NavbarToggler onClick={toggle} />
-          <Collapse isOpen={isOpen} navbar>
-            <Nav className="ml-auto" navbar>
-              {!user ? (
-                <NavItem>
-                </NavItem>
-              ) : (
-                <>
-                  <NavItem>
-                    <PageLink href="/profile" className="nav-link">Profile</PageLink>
-                  </NavItem>
-                  <NavItem>
-                    <a href="/api/auth/logout" className="nav-link">Logout</a>
-                  </NavItem>
-                </>
-              )}
-            </Nav>
-          </Collapse>
-        </Container>
-      </Navbar>
-      {!user && (
-        <div className="login-button-container">
-          <a href="/api/auth/login" className="login-button">Login</a>
-        </div>
+    <div className="login-button-container">
+      {!user ? (
+        <a href="/api/auth/login" className="login-button">Login</a>
+      ) : (
+        <a href="/api/auth/logout" className="logout-button">Logout</a>
       )}
+
+      <style jsx>{`
+        .login-button-container {
+          position: absolute;
+          top: 20px;
+          right: 20px;
+          z-index: 10;
+        }
+
+        .logout-button, .login-button {
+          background-color: #007bff;
+          color: white;
+          padding: 10px 20px;
+          text-align: center;
+          border-radius: 5px;
+          font-size: 16px;
+          text-decoration: none;
+        }
+      `}</style>
     </div>
   );
 };
