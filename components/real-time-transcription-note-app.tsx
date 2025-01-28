@@ -1006,7 +1006,7 @@ export default function Component() {
                                         onChange={handleNoteEdit}
                                     />
                                 ) : (
-                                    <NotesBox content={notes[currentPage]?.content || "Click to edit..."} />
+                                    <NotesBox content={notes[currentPage]?.content || "Waiting for input..."} />
                                 )}
                             </div>
                             {isMathMode && (
